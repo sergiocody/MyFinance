@@ -1,6 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType } from "@google/generative-ai";
+
+type ParsedAiTransaction = {
+  date?: unknown;
+  description?: unknown;
+  amount?: unknown;
+  type?: unknown;
+  category_id?: unknown;
+  notes?: unknown;
+};
+
+const transactionSchema = {
+  type: SchemaType.ARRAY,
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      date: { type: SchemaType.STRING },
+      description: { type: SchemaType.STRING },
+      amount: { type: SchemaType.NUMBER },
+      type: { type: SchemaType.STRING },
+      category_id: { type: SchemaType.STRING, nullable: true },
+      notes: { type: SchemaType.STRING },
+    },
+    required: ["date", "description", "amount", "type", "notes"],
+  },
+} as const;
+
+function extractJsonPayload(text: string) {
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    throw new Error("AI returned an empty response");
+  }
+
+  if (trimmed.startsWith("```")) {
+    return trimmed.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+  }
+
+  const firstBracket = trimmed.indexOf("[");
+  const lastBracket = trimmed.lastIndexOf("]");
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket >= firstBracket) {
+    return trimmed.slice(firstBracket, lastBracket + 1);
+  }
+
+  return trimmed;
+}
+
+function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
+  return transactions
+    .filter((transaction) => {
+      const amount = Number(transaction.amount);
+      return transaction.date && Number.isFinite(amount) && amount > 0;
+    })
+    .map((transaction) => ({
+      date: String(transaction.date),
+      description: String(transaction.description ?? ""),
+      amount: Number(transaction.amount),
+      type: transaction.type === "income" ? "income" : "expense",
+      category_id:
+        typeof transaction.category_id === "string" && transaction.category_id.length > 0
+          ? transaction.category_id
+          : null,
+      notes: String(transaction.notes ?? ""),
+    }));
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,15 +145,16 @@ Return ONLY a valid JSON array of objects. No markdown, no explanations. Example
 [{"date":"2024-01-15","description":"LIDL Store","amount":45.30,"type":"expense","category_id":"abc-123","notes":""}]`;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: transactionSchema,
+        temperature: 0.2,
+      },
+    });
     const text = result.response.text();
-
-    // Extract JSON from response (handle possible markdown wrapping)
-    let jsonStr = text.trim();
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
+    const jsonStr = extractJsonPayload(text);
     const transactions = JSON.parse(jsonStr);
 
     if (!Array.isArray(transactions)) {
@@ -99,26 +164,45 @@ Return ONLY a valid JSON array of objects. No markdown, no explanations. Example
       );
     }
 
-    // Validate and sanitize each transaction
-    const validated = transactions
-      .filter(
-        (t: Record<string, unknown>) =>
-          t.date && typeof t.amount === "number" && t.amount > 0
-      )
-      .map((t: Record<string, unknown>) => ({
-        date: String(t.date),
-        description: String(t.description ?? ""),
-        amount: Number(t.amount),
-        type: t.type === "income" ? "income" : "expense",
-        category_id: t.category_id || null,
-        notes: String(t.notes ?? ""),
-      }));
+    const validated = sanitizeTransactions(transactions as ParsedAiTransaction[]);
+
+    if (validated.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI could not extract any transactions from this file. Check that the file is a bank CSV with dates and amounts.",
+        },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({ transactions: validated });
   } catch (error) {
     console.error("Import parse error:", error);
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI returned an invalid response while parsing this file. Try again or use a smaller/cleaner CSV export.",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (error instanceof GoogleGenerativeAIError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI parser is unavailable right now. Check GEMINI_API_KEY and try again in a moment.",
+        },
+        { status: 502 }
+      );
+    }
+
+    const message = error instanceof Error ? error.message : "Failed to parse CSV with AI";
     return NextResponse.json(
-      { error: "Failed to parse CSV with AI" },
+      { error: message },
       { status: 500 }
     );
   }
