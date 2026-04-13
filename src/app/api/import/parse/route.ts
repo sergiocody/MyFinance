@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType } from "@google/generative-ai";
+import Papa from "papaparse";
 
 type ParserProvider = "gemini" | "ollama";
 
@@ -11,12 +12,19 @@ type CategoryOption = {
 };
 
 type ParsedAiTransaction = {
+  source_row?: unknown;
   date?: unknown;
   description?: unknown;
   amount?: unknown;
   type?: unknown;
   category_id?: unknown;
   notes?: unknown;
+};
+
+type StructuredCsvRow = {
+  row_number: number;
+  columns: Record<string, string>;
+  raw_values: string[];
 };
 
 type ParseRequestBody = {
@@ -34,6 +42,7 @@ const transactionSchema = {
   items: {
     type: SchemaType.OBJECT,
     properties: {
+      source_row: { type: SchemaType.INTEGER },
       date: { type: SchemaType.STRING },
       description: { type: SchemaType.STRING },
       amount: { type: SchemaType.NUMBER },
@@ -84,18 +93,55 @@ function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
     }));
 }
 
-function buildPrompt(categoryList: string, csvContent: string) {
+function parseCsvRows(csvContent: string) {
+  const parsed = Papa.parse<string[]>(csvContent.replace(/^\uFEFF/, ""), {
+    skipEmptyLines: "greedy",
+    delimitersToGuess: [",", ";", "\t", "|"],
+  });
+
+  const rows = parsed.data
+    .map((row) => row.map((cell) => String(cell ?? "").trim()))
+    .filter((row) => row.some((cell) => cell.length > 0));
+
+  if (rows.length < 2) {
+    throw new Error("CSV file does not contain enough rows to parse");
+  }
+
+  const header = rows[0].map((value, index) => value || `column_${index + 1}`);
+  const dataRows: StructuredCsvRow[] = rows.slice(1).map((row, index) => {
+    const width = Math.max(header.length, row.length);
+    const values = Array.from({ length: width }, (_, valueIndex) => row[valueIndex] ?? "");
+    const columns = Object.fromEntries(
+      values.map((value, valueIndex) => [header[valueIndex] ?? `column_${valueIndex + 1}`, value])
+    );
+
+    return {
+      row_number: index + 2,
+      columns,
+      raw_values: values,
+    };
+  });
+
+  return {
+    header,
+    dataRows,
+  };
+}
+
+function buildPrompt(categoryList: string, header: string[], dataRows: StructuredCsvRow[]) {
   return `You are a financial data parser. Analyze this bank CSV export and extract transactions.
 
 Available categories:
 ${categoryList}
 
-CSV content (first 200 rows max):
-\`\`\`
-${csvContent.split("\n").slice(0, 201).join("\n")}
-\`\`\`
+CSV header columns:
+${header.join(" | ")}
 
-Parse each row into a transaction. For each transaction, determine:
+Candidate CSV rows (${dataRows.length} rows, first 200 max):
+${JSON.stringify(dataRows.slice(0, 200), null, 2)}
+
+Parse each source row into a transaction. For each transaction, determine:
+0. "source_row" - the original CSV row number from the input above
 1. "date" - in YYYY-MM-DD format. Try common formats: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD.MM.YYYY
 2. "description" - the payee or memo from the bank
 3. "amount" - always positive number. Handle comma as decimal separator (European format) and dot as thousands separator if needed
@@ -104,15 +150,16 @@ Parse each row into a transaction. For each transaction, determine:
 6. "notes" - any additional info from the CSV row
 
 Important rules:
-- Skip header rows
-- Skip empty rows or summary/total rows
+- Return one JSON object per source row that represents a real transaction
+- Do not merge multiple source rows into one output object
+- Skip only rows that are empty, totals, balances, summaries, or obvious non-transaction metadata
 - If the CSV has separate debit/credit columns, handle accordingly
 - If amount is negative, it's an expense (make amount positive). If positive, it's income.
 - Be smart about category matching: "SUPERMARKET", "LIDL", "MERCADONA" -> Groceries, "UBER", "TAXI", "METRO" -> Transport, etc.
 - Return ONLY a valid JSON array as the top-level value
 
 Example:
-[{"date":"2024-01-15","description":"LIDL Store","amount":45.30,"type":"expense","category_id":"abc-123","notes":""}]`;
+[{"source_row":2,"date":"2024-01-15","description":"LIDL Store","amount":45.30,"type":"expense","category_id":"abc-123","notes":""}]`;
 }
 
 async function parseWithGemini(prompt: string, apiKey: string) {
@@ -235,7 +282,16 @@ export async function POST(request: NextRequest) {
       .map((c) => `- ${c.name} (${c.type}, id: ${c.id})`)
       .join("\n");
 
-    const prompt = buildPrompt(categoryList, csvContent);
+    const { header, dataRows } = parseCsvRows(csvContent);
+
+    if (dataRows.length === 0) {
+      return NextResponse.json(
+        { error: "The CSV file does not contain any data rows." },
+        { status: 400 }
+      );
+    }
+
+    const prompt = buildPrompt(categoryList, header, dataRows);
     const transactions =
       provider === "ollama"
         ? await parseWithOllama(prompt)
@@ -257,6 +313,15 @@ export async function POST(request: NextRequest) {
             "The AI could not extract any transactions from this file. Check that the file is a bank CSV with dates and amounts.",
         },
         { status: 400 }
+      );
+    }
+
+    if (validated.length < Math.max(3, Math.floor(dataRows.length / 2))) {
+      return NextResponse.json(
+        {
+          error: `Only ${validated.length} transactions were extracted from ${dataRows.length} CSV rows. The parser likely did not understand the file format well enough.`,
+        },
+        { status: 422 }
       );
     }
 
