@@ -54,6 +54,29 @@ const transactionSchema = {
   },
 } as const;
 
+const ollamaTransactionFormat = {
+  type: "object",
+  properties: {
+    transactions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          source_row: { type: "integer" },
+          date: { type: "string" },
+          description: { type: "string" },
+          amount: { type: "number" },
+          type: { type: "string" },
+          category_id: { type: "string" },
+          notes: { type: "string" },
+        },
+        required: ["date", "description", "amount", "type", "notes"],
+      },
+    },
+  },
+  required: ["transactions"],
+} as const;
+
 function extractJsonPayload(text: string) {
   const trimmed = text.trim();
 
@@ -65,13 +88,51 @@ function extractJsonPayload(text: string) {
     return trimmed.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   }
 
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return trimmed;
+  }
+
   const firstBracket = trimmed.indexOf("[");
   const lastBracket = trimmed.lastIndexOf("]");
   if (firstBracket !== -1 && lastBracket !== -1 && lastBracket >= firstBracket) {
     return trimmed.slice(firstBracket, lastBracket + 1);
   }
 
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
   return trimmed;
+}
+
+function normalizeTransactionsPayload(payload: unknown) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    const objectPayload = payload as {
+      transactions?: unknown;
+      items?: unknown;
+      data?: unknown;
+    };
+
+    if (Array.isArray(objectPayload.transactions)) {
+      return objectPayload.transactions;
+    }
+
+    if (Array.isArray(objectPayload.items)) {
+      return objectPayload.items;
+    }
+
+    if (Array.isArray(objectPayload.data)) {
+      return objectPayload.data;
+    }
+  }
+
+  return null;
 }
 
 function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
@@ -189,7 +250,7 @@ async function parseWithOllama(prompt: string) {
       model: OLLAMA_MODEL,
       prompt,
       stream: false,
-      format: "json",
+      format: ollamaTransactionFormat,
       options: {
         temperature: 0.2,
       },
@@ -292,12 +353,14 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = buildPrompt(categoryList, header, dataRows);
-    const transactions =
+    const rawTransactions =
       provider === "ollama"
         ? await parseWithOllama(prompt)
         : await parseWithGemini(prompt, process.env.GEMINI_API_KEY!);
 
-    if (!Array.isArray(transactions)) {
+    const transactions = normalizeTransactionsPayload(rawTransactions);
+
+    if (!transactions) {
       return NextResponse.json(
         { error: "AI returned invalid format" },
         { status: 500 }
