@@ -184,62 +184,120 @@ export default function ImportPage() {
   }
 
   async function handleImport() {
+    setError("");
     setStep("importing");
     const selected = transactions.filter((t) => t.selected);
+    let importLogId: string | null = null;
 
-    // Create import log
-    const { data: importLog } = await supabase
-      .from("imports")
-      .insert({
-        filename: fileName,
-        account_id: selectedAccount,
-        status: "processing",
-      })
-      .select()
-      .single();
-
-    // Insert transactions in batches
-    const batchSize = 50;
-    let imported = 0;
-
-    for (let i = 0; i < selected.length; i += batchSize) {
-      const batch = selected.slice(i, i + batchSize).map((t) => ({
-        account_id: selectedAccount,
-        category_id: t.category_id,
-        type: t.type,
-        amount: t.amount,
-        description: t.description,
-        notes: t.notes || null,
-        date: t.date,
-        transaction_hash: t.hash,
-        import_id: importLog?.id ?? null,
-      }));
-
-      const { data, error } = await supabase
-        .from("transactions")
-        .upsert(batch, {
-          onConflict: "account_id,transaction_hash",
-          ignoreDuplicates: true,
+    try {
+      const { data: importLog, error: importLogError } = await supabase
+        .from("imports")
+        .insert({
+          filename: fileName,
+          account_id: selectedAccount,
+          status: "processing",
         })
-        .select("id");
+        .select()
+        .single();
 
-      if (!error) imported += data?.length ?? 0;
-    }
+      if (importLogError) {
+        throw importLogError;
+      }
 
-    const skipped = transactions.length - imported;
+      importLogId = importLog.id;
 
-    if (importLog) {
+      // Insert transactions in batches
+      const batchSize = 50;
+      let imported = 0;
+      let failed = 0;
+      const failureMessages: string[] = [];
+
+      for (let i = 0; i < selected.length; i += batchSize) {
+        const batch = selected.slice(i, i + batchSize).map((t) => ({
+          account_id: selectedAccount,
+          category_id: t.category_id,
+          type: t.type,
+          amount: t.amount,
+          description: t.description,
+          notes: t.notes || null,
+          date: t.date,
+          transaction_hash: t.hash,
+          import_id: importLogId,
+        }));
+
+        const { data, error: batchError } = await supabase
+          .from("transactions")
+          .upsert(batch, {
+            onConflict: "account_id,transaction_hash",
+            ignoreDuplicates: true,
+          })
+          .select("id");
+
+        if (!batchError) {
+          imported += data?.length ?? 0;
+          continue;
+        }
+
+        for (const row of batch) {
+          const { data: singleData, error: singleError } = await supabase
+            .from("transactions")
+            .upsert([row], {
+              onConflict: "account_id,transaction_hash",
+              ignoreDuplicates: true,
+            })
+            .select("id");
+
+          if (singleError) {
+            failed += 1;
+
+            if (failureMessages.length < 3) {
+              failureMessages.push(`${row.date} · ${row.description}: ${singleError.message}`);
+            }
+
+            continue;
+          }
+
+          imported += singleData?.length ?? 0;
+        }
+      }
+
+      const skipped = transactions.length - imported;
+      const status = failed > 0 ? (imported > 0 ? "partial" : "failed") : "completed";
+
       await supabase
         .from("imports")
-        .update({ rows_imported: imported, rows_skipped: skipped, status: "completed" })
-        .eq("id", importLog.id);
-    }
+        .update({ rows_imported: imported, rows_skipped: skipped, status })
+        .eq("id", importLogId);
 
-    setImportResult({
-      imported,
-      skipped,
-    });
-    setStep("done");
+      if (failed > 0 && imported === 0) {
+        throw new Error(
+          failureMessages[0] ?? "No transactions could be imported. Review the parsed rows and try again."
+        );
+      }
+
+      setImportResult({
+        imported,
+        skipped,
+      });
+
+      if (failed > 0) {
+        setError(
+          `Imported ${imported} transaction(s). ${failed} row(s) failed: ${failureMessages.join(" | ")}`
+        );
+      }
+
+      setStep("done");
+    } catch (err) {
+      if (importLogId) {
+        await supabase
+          .from("imports")
+          .update({ status: "failed" })
+          .eq("id", importLogId);
+      }
+
+      setError(err instanceof Error ? err.message : "Failed to import transactions");
+      setStep("review");
+    }
   }
 
   function toggleTransaction(index: number) {
@@ -280,6 +338,13 @@ export default function ImportPage() {
   return (
     <div className="space-y-6 pt-12 lg:pt-0">
       <h1 className="text-2xl font-bold text-gray-900">Import Transactions</h1>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <XCircle size={16} />
+          {error}
+        </div>
+      )}
 
       {/* Account selection */}
       {step === "upload" && (
@@ -352,14 +417,6 @@ export default function ImportPage() {
                 />
               </label>
             </div>
-
-            {error && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                <XCircle size={16} />
-                {error}
-              </div>
-            )}
-
             <div className="rounded-lg bg-blue-50 px-4 py-3">
               <p className="text-sm font-medium text-blue-800">How it works</p>
               <ol className="mt-1 list-inside list-decimal text-xs text-blue-700 space-y-1">
@@ -625,7 +682,15 @@ export default function ImportPage() {
 
 function ImportHistory() {
   const [imports, setImports] = useState<
-    { id: string; filename: string; rows_imported: number; rows_skipped: number; created_at: string; accounts: { name: string } | null }[]
+    {
+      id: string;
+      filename: string;
+      rows_imported: number;
+      rows_skipped: number;
+      status: string;
+      created_at: string;
+      accounts: { name: string } | null;
+    }[]
   >([]);
 
   useEffect(() => {
@@ -652,7 +717,10 @@ function ImportHistory() {
               <div>
                 <p className="text-sm font-medium text-gray-900">{imp.filename}</p>
                 <p className="text-xs text-gray-500">
-                  {imp.accounts?.name} · {imp.rows_imported} imported · {formatDate(imp.created_at)}
+                  {imp.accounts?.name} · {imp.rows_imported} imported
+                  {imp.rows_skipped > 0 ? ` · ${imp.rows_skipped} skipped` : ""}
+                  {imp.status !== "completed" ? ` · ${imp.status}` : ""}
+                  {` · ${formatDate(imp.created_at)}`}
                 </p>
               </div>
             </div>

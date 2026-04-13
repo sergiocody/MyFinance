@@ -144,7 +144,28 @@ function normalizeTransactionsPayload(payload: unknown) {
   return null;
 }
 
-function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
+function sanitizeCategoryId(
+  categoryId: unknown,
+  type: "income" | "expense",
+  categories: CategoryOption[]
+) {
+  if (typeof categoryId !== "string" || categoryId.length === 0) {
+    return null;
+  }
+
+  const category = categories.find((item) => item.id === categoryId);
+
+  if (!category || category.type !== type) {
+    return null;
+  }
+
+  return category.id;
+}
+
+function sanitizeTransactions(
+  transactions: ParsedAiTransaction[],
+  categories: CategoryOption[]
+) {
   return transactions
     .filter((transaction) => {
       const amount = Number(transaction.amount);
@@ -163,10 +184,7 @@ function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
         description: String(transaction.description ?? ""),
         amount: Math.abs(rawAmount),
         type: inferredType,
-        category_id:
-          typeof transaction.category_id === "string" && transaction.category_id.length > 0
-            ? transaction.category_id
-            : null,
+        category_id: sanitizeCategoryId(transaction.category_id, inferredType, categories),
         notes: String(transaction.notes ?? ""),
       };
     });
@@ -624,7 +642,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validated = sanitizeTransactions(transactions as ParsedAiTransaction[]);
+    const validated = sanitizeTransactions(
+      transactions as ParsedAiTransaction[],
+      categories ?? []
+    );
 
     if (validated.length === 0) {
       const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
