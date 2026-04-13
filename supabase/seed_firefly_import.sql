@@ -535,10 +535,7 @@ BEGIN
   JOIN accounts a ON a.user_id = v_uid AND a.name = r.account_name
   LEFT JOIN categories c ON c.user_id = v_uid AND lower(c.name) = lower(r.category_name)
   LEFT JOIN accounts da ON da.user_id = v_uid AND da.name = r.dest_account
-  WHERE NOT EXISTS (
-    SELECT 1 FROM transactions t
-    WHERE t.account_id = a.id AND t.transaction_hash = r.txn_hash
-  );
+  ON CONFLICT (account_id, transaction_hash) WHERE transaction_hash IS NOT NULL DO NOTHING;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'Transactions inserted: %', v_count;
