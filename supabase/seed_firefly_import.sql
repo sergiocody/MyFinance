@@ -33,17 +33,24 @@ BEGIN
   END IF;
   RAISE NOTICE 'Importing data for user %', v_uid;
 
-  -- Cleanup any previous import attempt
-  DELETE FROM transaction_labels WHERE transaction_id IN (
-    SELECT id FROM transactions WHERE import_id IN (
-      SELECT id FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm'
-    )
-  );
-  DELETE FROM transactions WHERE import_id IN (
-    SELECT id FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm'
-  );
+  -- Cleanup ALL previous import attempts (by hash + by import filename)
+  DELETE FROM transaction_labels tl
+  USING transactions t, accounts a
+  WHERE tl.transaction_id = t.id
+    AND t.account_id = a.id
+    AND a.user_id = v_uid
+    AND t.transaction_hash IS NOT NULL;
+
+  DELETE FROM transactions t
+  USING accounts a
+  WHERE t.account_id = a.id
+    AND a.user_id = v_uid
+    AND t.transaction_hash IS NOT NULL;
+
   DELETE FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm';
-  RAISE NOTICE 'Cleaned up any previous import';
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE 'Cleaned up previous data (deleted transactions with hashes for this user)';
 
   -- Import log
   INSERT INTO imports (user_id, filename, rows_imported, status)
@@ -513,7 +520,7 @@ BEGIN
 
   RAISE NOTICE 'Temp table loaded with % raw rows', (SELECT count(*) FROM _txn_raw);
 
-  -- Now insert into transactions using JOINs (more robust than subqueries)
+  -- Now insert into transactions using JOINs (deduplicated within batch)
   INSERT INTO transactions (
     user_id, account_id, category_id, type, amount,
     description, notes, date, transfer_to_account_id,
@@ -531,11 +538,13 @@ BEGIN
     da.id,
     v_import_id,
     r.txn_hash
-  FROM _txn_raw r
+  FROM (
+    SELECT DISTINCT ON (account_name, txn_hash) *
+    FROM _txn_raw
+  ) r
   JOIN accounts a ON a.user_id = v_uid AND a.name = r.account_name
   LEFT JOIN categories c ON c.user_id = v_uid AND lower(c.name) = lower(r.category_name)
-  LEFT JOIN accounts da ON da.user_id = v_uid AND da.name = r.dest_account
-  ON CONFLICT (account_id, transaction_hash) WHERE transaction_hash IS NOT NULL DO NOTHING;
+  LEFT JOIN accounts da ON da.user_id = v_uid AND da.name = r.dest_account;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'Transactions inserted: %', v_count;
