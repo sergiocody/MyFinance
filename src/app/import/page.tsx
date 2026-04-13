@@ -393,6 +393,12 @@ export default function ImportPage() {
                     {transactions.length} transactions found ·{" "}
                     {transactions.filter((t) => t.selected).length} selected
                   </p>
+                  {currentAccount && (
+                    <p className="mt-0.5 text-xs font-medium text-indigo-600">
+                      → Importing into: {currentAccount.name}
+                      {currentAccount.bank_name ? ` (${currentAccount.bank_name})` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2">
