@@ -10,7 +10,7 @@ A modern personal finance application built with **Next.js**, **Supabase**, and 
 - **Transactions** — Full CRUD with filtering by account, category, type, and date range
 - **Categories** — Organize transactions (Groceries, Transport, Salary, etc.)
 - **Labels** — Tag transactions with custom labels (Essential, Recurring, etc.)
-- **Smart Import** — Drop a bank CSV file, let AI categorize transactions, and automatically skip duplicates
+- **Smart Import** — Drop a bank CSV file, choose Gemini or local Ollama Gemma, and automatically skip duplicates
 
 ## Tech Stack
 
@@ -18,7 +18,7 @@ A modern personal finance application built with **Next.js**, **Supabase**, and 
 - **Styling**: Tailwind CSS 4
 - **Database**: Supabase (PostgreSQL)
 - **Charts**: Recharts
-- **AI**: Google Gemini 2.0 Flash
+- **AI**: Google Gemini 2.0 Flash or local Ollama Gemma
 - **Icons**: Lucide React
 
 ## Setup
@@ -37,14 +37,37 @@ A modern personal finance application built with **Next.js**, **Supabase**, and 
 
 Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API key
 
-### 3. Configure Environment
+### 3. Optional: Use Ollama Instead of Gemini
+
+If you prefer local parsing, run Ollama locally with a Gemma model, for example:
+
+```bash
+ollama pull gemma3:4b
+ollama serve
+```
+
+The import page lets you choose between `Gemini` and `Ollama Gemma`.
+By default the app calls:
+
+- `http://127.0.0.1:11434/api/generate`
+- model `gemma3:4b`
+
+### 4. Configure Environment
 
 ```bash
 cp .env.local.example .env.local
-# Edit .env.local with your Supabase URL, anon key, and Gemini API key
+# Edit .env.local with your Supabase URL, anon key, and optional AI settings
 ```
 
-### 4. Install and Run
+Environment variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GEMINI_API_KEY` for Gemini imports
+- `OLLAMA_BASE_URL` optional, defaults to `http://127.0.0.1:11434`
+- `OLLAMA_MODEL` optional, defaults to `gemma3:4b`
+
+### 5. Install and Run
 
 ```bash
 npm install
@@ -60,7 +83,7 @@ Open [http://localhost:3000](http://localhost:3000)
 3. Add these environment variables in the Vercel project settings:
 	- `NEXT_PUBLIC_SUPABASE_URL`
 	- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-	- `GEMINI_API_KEY`
+	- `GEMINI_API_KEY` if you want Gemini imports
 4. In Supabase **Authentication > URL Configuration**, add your Vercel production URL as the site URL and redirect URL
 5. Deploy
 

@@ -20,6 +20,8 @@ interface ParsedTransaction {
   selected: boolean;
 }
 
+type ParserProvider = "gemini" | "ollama";
+
 type ImportStep = "upload" | "parsing" | "review" | "importing" | "done";
 
 export default function ImportPage() {
@@ -27,12 +29,15 @@ export default function ImportPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedAccount, setSelectedAccount] = useState("");
+  const [parserProvider, setParserProvider] = useState<ParserProvider>("gemini");
   const [step, setStep] = useState<ImportStep>("upload");
   const [fileName, setFileName] = useState("");
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
   const [importResult, setImportResult] = useState({ imported: 0, skipped: 0 });
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
+
+  const parserLabel = parserProvider === "ollama" ? "Ollama Gemma" : "Gemini";
 
   useEffect(() => {
     async function load() {
@@ -98,6 +103,7 @@ export default function ImportPage() {
             csvContent: text,
             categories: categories.map((c) => ({ id: c.id, name: c.name, type: c.type })),
             accountId: selectedAccount,
+            provider: parserProvider,
           }),
         });
 
@@ -141,7 +147,7 @@ export default function ImportPage() {
         setStep("upload");
       }
     },
-    [selectedAccount, categories, session?.access_token]
+    [selectedAccount, categories, parserProvider, session?.access_token]
   );
 
   function handleDrop(e: React.DragEvent) {
@@ -270,6 +276,25 @@ export default function ImportPage() {
               </select>
             </div>
 
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Parser
+              </label>
+              <select
+                value={parserProvider}
+                onChange={(e) => setParserProvider(e.target.value as ParserProvider)}
+                className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="gemini">Gemini</option>
+                <option value="ollama">Ollama Gemma</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {parserProvider === "ollama"
+                  ? "Uses your local Ollama model at http://localhost:11434 (default: gemma3:4b)."
+                  : "Uses Google Gemini via GEMINI_API_KEY on the server."}
+              </p>
+            </div>
+
             {/* Drop zone */}
             <div
               onDrop={handleDrop}
@@ -313,8 +338,9 @@ export default function ImportPage() {
               <p className="text-sm font-medium text-blue-800">How it works</p>
               <ol className="mt-1 list-inside list-decimal text-xs text-blue-700 space-y-1">
                 <li>Select the account to import into</li>
+                <li>Choose Gemini or Ollama Gemma as the parser</li>
                 <li>Drop your bank CSV export file</li>
-                <li>AI analyzes and categorizes each transaction</li>
+                <li>The selected parser analyzes and categorizes each transaction</li>
                 <li>Review, adjust categories, and confirm</li>
               </ol>
             </div>
@@ -327,9 +353,9 @@ export default function ImportPage() {
         <Card>
           <div className="flex flex-col items-center py-12">
             <Loader2 className="mb-4 h-10 w-10 animate-spin text-indigo-600" />
-            <p className="font-medium text-gray-900">Analyzing your file with AI...</p>
+            <p className="font-medium text-gray-900">Analyzing your file with {parserLabel}...</p>
             <p className="mt-1 text-sm text-gray-500">
-              Parsing {fileName} and categorizing transactions
+              Parsing {fileName} and categorizing transactions with {parserLabel}
             </p>
           </div>
         </Card>

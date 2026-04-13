@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType } from "@google/generative-ai";
 
+type ParserProvider = "gemini" | "ollama";
+
+type CategoryOption = {
+  name: string;
+  type: string;
+  id: string;
+};
+
 type ParsedAiTransaction = {
   date?: unknown;
   description?: unknown;
@@ -10,6 +18,16 @@ type ParsedAiTransaction = {
   category_id?: unknown;
   notes?: unknown;
 };
+
+type ParseRequestBody = {
+  csvContent?: string;
+  categories?: CategoryOption[];
+  accountId?: string;
+  provider?: ParserProvider;
+};
+
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
 const transactionSchema = {
   type: SchemaType.ARRAY,
@@ -66,57 +84,8 @@ function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
     }));
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-
-    if (!apiKey || !supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json(
-        { error: "Server environment variables are incomplete" },
-        { status: 500 }
-      );
-    }
-
-    if (!accessToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const authClient = createClient(supabaseUrl, supabaseAnonKey);
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser(accessToken);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const { csvContent, categories, accountId } = await request.json();
-
-    if (!csvContent || !accountId) {
-      return NextResponse.json(
-        { error: "Missing csvContent or accountId" },
-        { status: 400 }
-      );
-    }
-
-    // Limit CSV size to prevent abuse (max ~500KB)
-    if (csvContent.length > 500_000) {
-      return NextResponse.json(
-        { error: "File too large. Max 500KB of CSV content." },
-        { status: 400 }
-      );
-    }
-
-    const categoryList = (categories ?? [])
-      .map((c: { name: string; type: string; id: string }) => `- ${c.name} (${c.type}, id: ${c.id})`)
-      .join("\n");
-
-    const prompt = `You are a financial data parser. Analyze this bank CSV export and extract transactions.
+function buildPrompt(categoryList: string, csvContent: string) {
+  return `You are a financial data parser. Analyze this bank CSV export and extract transactions.
 
 Available categories:
 ${categoryList}
@@ -140,22 +109,137 @@ Important rules:
 - If the CSV has separate debit/credit columns, handle accordingly
 - If amount is negative, it's an expense (make amount positive). If positive, it's income.
 - Be smart about category matching: "SUPERMARKET", "LIDL", "MERCADONA" -> Groceries, "UBER", "TAXI", "METRO" -> Transport, etc.
+- Return ONLY a valid JSON array as the top-level value
 
-Return ONLY a valid JSON array of objects. No markdown, no explanations. Example:
+Example:
 [{"date":"2024-01-15","description":"LIDL Store","amount":45.30,"type":"expense","category_id":"abc-123","notes":""}]`;
+}
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: transactionSchema,
+async function parseWithGemini(prompt: string, apiKey: string) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: transactionSchema,
+      temperature: 0.2,
+    },
+  });
+
+  const text = result.response.text();
+  const jsonStr = extractJsonPayload(text);
+  return JSON.parse(jsonStr);
+}
+
+async function parseWithOllama(prompt: string) {
+  const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      prompt,
+      stream: false,
+      format: "json",
+      options: {
         temperature: 0.2,
       },
-    });
-    const text = result.response.text();
-    const jsonStr = extractJsonPayload(text);
-    const transactions = JSON.parse(jsonStr);
+    }),
+  });
+
+  const rawText = await response.text();
+  let payload: { response?: string; error?: string } | null = null;
+
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText) as { response?: string; error?: string };
+    } catch {
+      throw new Error("Ollama returned a non-JSON response");
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `Ollama request failed with status ${response.status}`);
+  }
+
+  if (!payload?.response || payload.response.trim().length === 0) {
+    throw new Error("Ollama returned an empty response");
+  }
+
+  const jsonStr = extractJsonPayload(payload.response);
+  return JSON.parse(jsonStr);
+}
+
+export async function POST(request: NextRequest) {
+  let provider: ParserProvider = "gemini";
+
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: "Server environment variables are incomplete" },
+        { status: 500 }
+      );
+    }
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey);
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { csvContent, categories, accountId, provider: requestedProvider } =
+      (await request.json()) as ParseRequestBody;
+
+    provider = requestedProvider === "ollama" ? "ollama" : "gemini";
+
+    if (!csvContent || !accountId) {
+      return NextResponse.json(
+        { error: "Missing csvContent or accountId" },
+        { status: 400 }
+      );
+    }
+
+    if (provider === "gemini" && !process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            "GEMINI_API_KEY is missing on the server. Switch to Ollama Gemma or configure Gemini.",
+        },
+        { status: 500 }
+      );
+    }
+
+    // Limit CSV size to prevent abuse (max ~500KB)
+    if (csvContent.length > 500_000) {
+      return NextResponse.json(
+        { error: "File too large. Max 500KB of CSV content." },
+        { status: 400 }
+      );
+    }
+
+    const categoryList = (categories ?? [])
+      .map((c) => `- ${c.name} (${c.type}, id: ${c.id})`)
+      .join("\n");
+
+    const prompt = buildPrompt(categoryList, csvContent);
+    const transactions =
+      provider === "ollama"
+        ? await parseWithOllama(prompt)
+        : await parseWithGemini(prompt, process.env.GEMINI_API_KEY!);
 
     if (!Array.isArray(transactions)) {
       return NextResponse.json(
@@ -178,13 +262,24 @@ Return ONLY a valid JSON array of objects. No markdown, no explanations. Example
 
     return NextResponse.json({ transactions: validated });
   } catch (error) {
-    console.error("Import parse error:", error);
+    console.error(`Import parse error (${provider}):`, error);
 
     if (error instanceof SyntaxError) {
       return NextResponse.json(
         {
           error:
-            "The AI returned an invalid response while parsing this file. Try again or use a smaller/cleaner CSV export.",
+            provider === "ollama"
+              ? "Ollama returned invalid JSON while parsing this file. Try again or use a smaller/cleaner CSV export."
+              : "The AI returned an invalid response while parsing this file. Try again or use a smaller/cleaner CSV export.",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (provider === "ollama" && error instanceof TypeError) {
+      return NextResponse.json(
+        {
+          error: `Ollama is not reachable at ${OLLAMA_BASE_URL}. Make sure Ollama is running and model ${OLLAMA_MODEL} is available.`,
         },
         { status: 502 }
       );
@@ -200,7 +295,13 @@ Return ONLY a valid JSON array of objects. No markdown, no explanations. Example
       );
     }
 
-    const message = error instanceof Error ? error.message : "Failed to parse CSV with AI";
+    const message =
+      error instanceof Error
+        ? error.message
+        : provider === "ollama"
+          ? "Failed to parse CSV with Ollama Gemma"
+          : "Failed to parse CSV with AI";
+
     return NextResponse.json(
       { error: message },
       { status: 500 }
