@@ -31,6 +31,7 @@ export default function TransactionsPage() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [formError, setFormError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   // Form
   const [form, setForm] = useState({
@@ -46,10 +47,12 @@ export default function TransactionsPage() {
   });
 
   const loadTransactions = useCallback(async () => {
+    setLoadError("");
+
     let query = supabase
       .from("transactions")
       .select(
-        "*, categories(*), accounts(*), transaction_labels(labels(*))",
+        "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), transaction_labels(labels(*))",
         { count: "exact" }
       )
       .order("date", { ascending: false })
@@ -61,7 +64,17 @@ export default function TransactionsPage() {
     if (filterDateFrom) query = query.gte("date", filterDateFrom);
     if (filterDateTo) query = query.lte("date", filterDateTo);
 
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Failed to load transactions", error);
+      setTransactions([]);
+      setTotalCount(0);
+      setLoadError(error.message);
+      setLoading(false);
+      return;
+    }
+
     if (data) setTransactions(data as unknown as TransactionWithRelations[]);
     if (count !== null) setTotalCount(count);
     setLoading(false);
@@ -292,6 +305,11 @@ export default function TransactionsPage() {
 
       {/* Transactions Table */}
       <Card className="overflow-x-auto p-0!">
+        {loadError && (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Failed to load transactions: {loadError}
+          </div>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase text-gray-500">
