@@ -4,10 +4,9 @@
 -- ============================================================
 --
 -- INSTRUCTIONS:
---   1. Open Supabase Dashboard > Authentication > Users
---   2. Copy your user UUID
---   3. Replace 'YOUR_USER_ID_HERE' below (one place)
---   4. Paste this entire file into the SQL Editor and Run
+--   1. Paste this entire file into the Supabase SQL Editor
+--   2. Run it — your user is detected automatically
+--   (If you have multiple users, set v_uid manually below)
 --
 -- This will create:
 --   • 14 accounts
@@ -21,9 +20,17 @@ BEGIN;
 
 DO $$
 DECLARE
-  v_uid UUID := 'YOUR_USER_ID_HERE';  -- ← CHANGE THIS
+  v_uid UUID;
   v_import_id UUID;
+  v_count INT;
 BEGIN
+
+  -- Auto-detect user (works if you have a single user)
+  SELECT id INTO v_uid FROM auth.users ORDER BY created_at LIMIT 1;
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'No users found in auth.users. Sign up in the app first.';
+  END IF;
+  RAISE NOTICE 'Importing data for user %', v_uid;
 
   -- Import log
   INSERT INTO imports (user_id, filename, rows_imported, status)
@@ -805,6 +812,19 @@ BEGIN
     ON lower(l.name) = lower(v.label_name)
     AND (l.user_id = v_uid OR l.user_id IS NULL)
   ON CONFLICT DO NOTHING;
+
+  -- Verification
+  SELECT count(*) INTO v_count FROM accounts WHERE user_id = v_uid;
+  RAISE NOTICE 'Accounts for user: %', v_count;
+  SELECT count(*) INTO v_count FROM categories WHERE user_id = v_uid;
+  RAISE NOTICE 'Categories for user: %', v_count;
+  SELECT count(*) INTO v_count FROM labels WHERE user_id = v_uid;
+  RAISE NOTICE 'Labels for user: %', v_count;
+  SELECT count(*) INTO v_count FROM transactions WHERE user_id = v_uid;
+  RAISE NOTICE 'Transactions for user: %', v_count;
+  SELECT count(*) INTO v_count FROM transaction_labels tl
+    JOIN transactions t ON t.id = tl.transaction_id WHERE t.user_id = v_uid;
+  RAISE NOTICE 'Transaction-label links: %', v_count;
 
 END $$;
 
