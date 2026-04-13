@@ -39,6 +39,14 @@ export default function ImportPage() {
 
   const parserLabel = parserProvider === "ollama" ? "Ollama Gemma" : "Gemini";
 
+  const currentAccount = accounts.find((a) => a.id === selectedAccount);
+  const projectedBalance = currentAccount
+    ? currentAccount.current_balance +
+      transactions
+        .filter((t) => t.selected)
+        .reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0)
+    : null;
+
   useEffect(() => {
     async function load() {
       const [{ data: accts }, { data: cats }] = await Promise.all([
@@ -392,6 +400,31 @@ export default function ImportPage() {
                 </button>
               </div>
             </div>
+            {projectedBalance !== null && currentAccount && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-gray-100 pt-3 text-sm">
+                <span className="text-gray-500">
+                  Saldo actual:{" "}
+                  <span className="font-medium text-gray-900">
+                    {formatCurrency(currentAccount.current_balance)}
+                  </span>
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className="text-gray-500">
+                  Saldo proyectado:{" "}
+                  <span className={`font-semibold ${projectedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(projectedBalance)}
+                  </span>
+                </span>
+                {(() => {
+                  const delta = projectedBalance - currentAccount.current_balance;
+                  return delta !== 0 ? (
+                    <span className={`text-xs ${delta > 0 ? "text-green-500" : "text-red-500"}`}>
+                      ({delta > 0 ? "+" : ""}{formatCurrency(delta)})
+                    </span>
+                  ) : null;
+                })()}
+              </div>
+            )}
           </Card>
 
           {transactions.some((tx) => tx.duplicateSource) && (
