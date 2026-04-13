@@ -36,12 +36,23 @@ export default function ImportPage() {
   const [importResult, setImportResult] = useState({ imported: 0, skipped: 0 });
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [balanceOverride, setBalanceOverride] = useState<string>("");
+  const [editingBalance, setEditingBalance] = useState(false);
 
   const parserLabel = parserProvider === "ollama" ? "Ollama Gemma" : "Gemini";
 
   const currentAccount = accounts.find((a) => a.id === selectedAccount);
+
+  // When account changes, reset override to its stored balance
+  useEffect(() => {
+    if (currentAccount) {
+      setBalanceOverride(String(currentAccount.current_balance));
+    }
+  }, [currentAccount?.id]);
+
+  const baseBalance = parseFloat(balanceOverride) || 0;
   const projectedBalance = currentAccount
-    ? currentAccount.current_balance +
+    ? baseBalance +
       transactions
         .filter((t) => t.selected)
         .reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0)
@@ -402,11 +413,29 @@ export default function ImportPage() {
             </div>
             {projectedBalance !== null && currentAccount && (
               <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-gray-100 pt-3 text-sm">
-                <span className="text-gray-500">
-                  Saldo actual:{" "}
-                  <span className="font-medium text-gray-900">
-                    {formatCurrency(currentAccount.current_balance)}
-                  </span>
+                <span className="flex items-center gap-1.5 text-gray-500">
+                  Saldo actual:&nbsp;
+                  {editingBalance ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={balanceOverride}
+                      onChange={(e) => setBalanceOverride(e.target.value)}
+                      onBlur={() => setEditingBalance(false)}
+                      onKeyDown={(e) => { if (e.key === "Enter") setEditingBalance(false); }}
+                      autoFocus
+                      className="w-28 rounded border border-indigo-400 px-2 py-0.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingBalance(true)}
+                      title="Haz clic para corregir el saldo actual"
+                      className="font-medium text-gray-900 underline decoration-dashed underline-offset-2 hover:text-indigo-600"
+                    >
+                      {formatCurrency(baseBalance)}
+                    </button>
+                  )}
+                  <span className="text-xs text-gray-400">(editable)</span>
                 </span>
                 <span className="text-gray-400">→</span>
                 <span className="text-gray-500">
@@ -416,7 +445,7 @@ export default function ImportPage() {
                   </span>
                 </span>
                 {(() => {
-                  const delta = projectedBalance - currentAccount.current_balance;
+                  const delta = projectedBalance - baseBalance;
                   return delta !== 0 ? (
                     <span className={`text-xs ${delta > 0 ? "text-green-500" : "text-red-500"}`}>
                       ({delta > 0 ? "+" : ""}{formatCurrency(delta)})
