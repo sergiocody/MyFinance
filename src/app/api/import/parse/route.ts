@@ -148,19 +148,28 @@ function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
   return transactions
     .filter((transaction) => {
       const amount = Number(transaction.amount);
-      return transaction.date && Number.isFinite(amount) && amount > 0;
+      return transaction.date && Number.isFinite(amount) && amount !== 0;
     })
-    .map((transaction) => ({
-      date: String(transaction.date),
-      description: String(transaction.description ?? ""),
-      amount: Number(transaction.amount),
-      type: transaction.type === "income" ? "income" : "expense",
-      category_id:
-        typeof transaction.category_id === "string" && transaction.category_id.length > 0
-          ? transaction.category_id
-          : null,
-      notes: String(transaction.notes ?? ""),
-    }));
+    .map((transaction) => {
+      const rawAmount = Number(transaction.amount);
+      // Infer type from sign if AI didn't return a valid type
+      const inferredType: "income" | "expense" =
+        transaction.type === "income" ? "income"
+        : transaction.type === "expense" ? "expense"
+        : rawAmount > 0 ? "income" : "expense";
+
+      return {
+        date: String(transaction.date),
+        description: String(transaction.description ?? ""),
+        amount: Math.abs(rawAmount),
+        type: inferredType,
+        category_id:
+          typeof transaction.category_id === "string" && transaction.category_id.length > 0
+            ? transaction.category_id
+            : null,
+        notes: String(transaction.notes ?? ""),
+      };
+    });
 }
 
 function normalizeText(value: string) {
