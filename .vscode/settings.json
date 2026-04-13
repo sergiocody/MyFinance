@@ -1,0 +1,5 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/tmp/xlenv/bin/python3": true
+    }
+}
