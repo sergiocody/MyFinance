@@ -24,6 +24,28 @@ type ParserProvider = "gemini" | "ollama";
 
 type ImportStep = "upload" | "parsing" | "review" | "importing" | "done";
 
+type PersistedTransactionRow = {
+  account_id: string;
+  category_id: string | null;
+  type: "income" | "expense";
+  amount: number;
+  description: string;
+  notes: string | null;
+  date: string;
+  transaction_hash: string;
+  import_id: string | null;
+};
+
+function isMissingOnConflictConstraint(error: { message?: string } | null | undefined) {
+  return error?.message?.includes(
+    "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+  );
+}
+
+function isDuplicateKeyError(error: { code?: string } | null | undefined) {
+  return error?.code === "23505";
+}
+
 export default function ImportPage() {
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -187,7 +209,9 @@ export default function ImportPage() {
     setError("");
     setStep("importing");
     const selected = transactions.filter((t) => t.selected);
+    const preSkipped = transactions.length - selected.length;
     let importLogId: string | null = null;
+    let useInsertFallback = false;
 
     try {
       const { data: importLog, error: importLogError } = await supabase
@@ -210,10 +234,11 @@ export default function ImportPage() {
       const batchSize = 50;
       let imported = 0;
       let failed = 0;
+      let ignoredDuplicates = 0;
       const failureMessages: string[] = [];
 
       for (let i = 0; i < selected.length; i += batchSize) {
-        const batch = selected.slice(i, i + batchSize).map((t) => ({
+        const batch: PersistedTransactionRow[] = selected.slice(i, i + batchSize).map((t) => ({
           account_id: selectedAccount,
           category_id: t.category_id,
           type: t.type,
@@ -225,43 +250,74 @@ export default function ImportPage() {
           import_id: importLogId,
         }));
 
-        const { data, error: batchError } = await supabase
-          .from("transactions")
-          .upsert(batch, {
-            onConflict: "account_id,transaction_hash",
-            ignoreDuplicates: true,
-          })
-          .select("id");
+        let batchResult;
 
-        if (!batchError) {
-          imported += data?.length ?? 0;
-          continue;
-        }
-
-        for (const row of batch) {
-          const { data: singleData, error: singleError } = await supabase
+        if (useInsertFallback) {
+          batchResult = await supabase.from("transactions").insert(batch).select("id");
+        } else {
+          batchResult = await supabase
             .from("transactions")
-            .upsert([row], {
+            .upsert(batch, {
               onConflict: "account_id,transaction_hash",
               ignoreDuplicates: true,
             })
             .select("id");
+        }
 
-          if (singleError) {
+        if (!useInsertFallback && isMissingOnConflictConstraint(batchResult.error)) {
+          useInsertFallback = true;
+          batchResult = await supabase.from("transactions").insert(batch).select("id");
+        }
+
+        if (!batchResult.error) {
+          const insertedCount = batchResult.data?.length ?? 0;
+          imported += insertedCount;
+          ignoredDuplicates += Math.max(0, batch.length - insertedCount);
+          continue;
+        }
+
+        for (const row of batch) {
+          let singleResult;
+
+          if (useInsertFallback) {
+            singleResult = await supabase.from("transactions").insert([row]).select("id");
+          } else {
+            singleResult = await supabase
+              .from("transactions")
+              .upsert([row], {
+                onConflict: "account_id,transaction_hash",
+                ignoreDuplicates: true,
+              })
+              .select("id");
+          }
+
+          if (!useInsertFallback && isMissingOnConflictConstraint(singleResult.error)) {
+            useInsertFallback = true;
+            singleResult = await supabase.from("transactions").insert([row]).select("id");
+          }
+
+          if (isDuplicateKeyError(singleResult.error)) {
+            ignoredDuplicates += 1;
+            continue;
+          }
+
+          if (singleResult.error) {
             failed += 1;
 
             if (failureMessages.length < 3) {
-              failureMessages.push(`${row.date} · ${row.description}: ${singleError.message}`);
+              failureMessages.push(`${row.date} · ${row.description}: ${singleResult.error.message}`);
             }
 
             continue;
           }
 
-          imported += singleData?.length ?? 0;
+          const insertedCount = singleResult.data?.length ?? 0;
+          imported += insertedCount;
+          ignoredDuplicates += Math.max(0, 1 - insertedCount);
         }
       }
 
-      const skipped = transactions.length - imported;
+      const skipped = preSkipped + ignoredDuplicates;
       const status = failed > 0 ? (imported > 0 ? "partial" : "failed") : "completed";
 
       await supabase
