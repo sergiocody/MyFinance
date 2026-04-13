@@ -27,6 +27,15 @@ type StructuredCsvRow = {
   raw_values: string[];
 };
 
+type ParsedTransaction = {
+  date: string;
+  description: string;
+  amount: number;
+  type: "income" | "expense";
+  category_id: string | null;
+  notes: string;
+};
+
 type ParseRequestBody = {
   csvContent?: string;
   categories?: CategoryOption[];
@@ -152,6 +161,211 @@ function sanitizeTransactions(transactions: ParsedAiTransaction[]) {
           : null,
       notes: String(transaction.notes ?? ""),
     }));
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function parseLocaleNumber(value: string) {
+  const trimmed = value.replace(/\s+/g, "").replace(/[^0-9,.-]/g, "");
+  if (!trimmed) {
+    return null;
+  }
+
+  const lastComma = trimmed.lastIndexOf(",");
+  const lastDot = trimmed.lastIndexOf(".");
+  let normalized = trimmed;
+
+  if (lastComma > lastDot) {
+    normalized = trimmed.replace(/\./g, "").replace(",", ".");
+  } else if (lastDot > lastComma) {
+    normalized = trimmed.replace(/,/g, "");
+  } else {
+    normalized = trimmed.replace(",", ".");
+  }
+
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function parseDateValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const iso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (iso) {
+    const [, year, month, day] = iso;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const euro = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (euro) {
+    const [, day, month, yearRaw] = euro;
+    const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function scoreHeader(header: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(header)) ? 10 : 0;
+}
+
+function detectColumnIndexes(header: string[], dataRows: StructuredCsvRow[]) {
+  const normalizedHeaders = header.map(normalizeText);
+  const samples = dataRows.slice(0, 10);
+
+  const datePatterns = [/^date$/, /fecha/, /booking/, /value date/, /operacion/, /movimiento/];
+  const descriptionPatterns = [/description/, /descripcion/, /concept/, /concepto/, /detalle/, /details?/, /merchant/, /payee/, /beneficiary/, /reference/];
+  const amountPatterns = [/^amount$/, /importe/, /import$/, /total/, /valor/, /^eur$/, /money/];
+  const debitPatterns = [/debit/, /cargo/, /withdrawal/, /outgoing/, /salida/];
+  const creditPatterns = [/credit/, /abono/, /deposit/, /incoming/, /entrada/];
+  const balancePatterns = [/balance/, /saldo/, /available/, /disponible/];
+
+  const scoreByIndex = header.map((_, index) => {
+    const values = samples.map((row) => row.raw_values[index] ?? "");
+    const dateScore = values.filter((value) => parseDateValue(value)).length;
+    const numericScore = values.filter((value) => parseLocaleNumber(value) !== null).length;
+    const textScore = values.filter((value) => value && parseLocaleNumber(value) === null && !parseDateValue(value)).length;
+
+    return {
+      index,
+      date: scoreHeader(normalizedHeaders[index], datePatterns) + dateScore,
+      description: scoreHeader(normalizedHeaders[index], descriptionPatterns) + textScore,
+      amount:
+        scoreHeader(normalizedHeaders[index], amountPatterns) +
+        numericScore -
+        scoreHeader(normalizedHeaders[index], balancePatterns),
+      debit: scoreHeader(normalizedHeaders[index], debitPatterns) + numericScore,
+      credit: scoreHeader(normalizedHeaders[index], creditPatterns) + numericScore,
+    };
+  });
+
+  const pickBest = (field: "date" | "description" | "amount" | "debit" | "credit") =>
+    [...scoreByIndex].sort((left, right) => right[field] - left[field])[0]?.index ?? -1;
+
+  const amountIndex = pickBest("amount");
+  const debitIndex = pickBest("debit");
+  const creditIndex = pickBest("credit");
+
+  return {
+    dateIndex: pickBest("date"),
+    descriptionIndex: pickBest("description"),
+    amountIndex: scoreByIndex[amountIndex]?.amount > 0 ? amountIndex : -1,
+    debitIndex: scoreByIndex[debitIndex]?.debit > 0 ? debitIndex : -1,
+    creditIndex: scoreByIndex[creditIndex]?.credit > 0 ? creditIndex : -1,
+  };
+}
+
+function matchCategoryId(
+  description: string,
+  type: "income" | "expense",
+  categories: CategoryOption[]
+) {
+  const normalizedDescription = normalizeText(description);
+  const filteredCategories = categories.filter((category) => category.type === type);
+
+  const directMatch = filteredCategories.find((category) =>
+    normalizedDescription.includes(normalizeText(category.name))
+  );
+  if (directMatch) {
+    return directMatch.id;
+  }
+
+  const keywordMap: Array<{ keywords: string[]; categoryNames: string[] }> = [
+    { keywords: ["mercadona", "lidl", "alcampo", "hipercor", "supermerc"], categoryNames: ["Alimentación", "Groceries"] },
+    { keywords: ["salary", "salario", "nomina"], categoryNames: ["Salario", "Salary"] },
+    { keywords: ["uber", "taxi", "metro", "bus", "gasolina", "parking"], categoryNames: ["Transporte", "Transport"] },
+    { keywords: ["cafe", "restaurant", "restaurante", "glovo", "comida", "cena"], categoryNames: ["Restaurantes", "Restaurants"] },
+    { keywords: ["interes"], categoryNames: ["Intereses_cuenta", "Interest"] },
+  ];
+
+  for (const rule of keywordMap) {
+    if (!rule.keywords.some((keyword) => normalizedDescription.includes(keyword))) {
+      continue;
+    }
+
+    const category = filteredCategories.find((item) =>
+      rule.categoryNames.some((name) => normalizeText(item.name) === normalizeText(name))
+    );
+
+    if (category) {
+      return category.id;
+    }
+  }
+
+  return null;
+}
+
+function parseTransactionsDeterministically(
+  header: string[],
+  dataRows: StructuredCsvRow[],
+  categories: CategoryOption[]
+): ParsedTransaction[] {
+  const { dateIndex, descriptionIndex, amountIndex, debitIndex, creditIndex } =
+    detectColumnIndexes(header, dataRows);
+
+  return dataRows.flatMap((row) => {
+    const dateValue = dateIndex >= 0 ? row.raw_values[dateIndex] ?? "" : row.raw_values.find(parseDateValue) ?? "";
+    const parsedDate = parseDateValue(dateValue);
+    if (!parsedDate) {
+      return [];
+    }
+
+    let rawAmount: number | null = null;
+    let type: "income" | "expense" = "expense";
+
+    if (amountIndex >= 0) {
+      rawAmount = parseLocaleNumber(row.raw_values[amountIndex] ?? "");
+      if (rawAmount === null || rawAmount === 0) {
+        return [];
+      }
+      type = rawAmount > 0 ? "income" : "expense";
+    } else {
+      const debitAmount = debitIndex >= 0 ? parseLocaleNumber(row.raw_values[debitIndex] ?? "") : null;
+      const creditAmount = creditIndex >= 0 ? parseLocaleNumber(row.raw_values[creditIndex] ?? "") : null;
+
+      if (creditAmount && creditAmount !== 0) {
+        rawAmount = creditAmount;
+        type = "income";
+      } else if (debitAmount && debitAmount !== 0) {
+        rawAmount = -Math.abs(debitAmount);
+        type = "expense";
+      } else {
+        return [];
+      }
+    }
+
+    const amount = Math.abs(rawAmount);
+    const description =
+      (descriptionIndex >= 0 ? row.raw_values[descriptionIndex] : "") ||
+      row.raw_values.find((value, index) => index !== dateIndex && index !== amountIndex && index !== debitIndex && index !== creditIndex && value.trim().length > 0) ||
+      `Row ${row.row_number}`;
+
+    const notes = Object.entries(row.columns)
+      .filter(([, value]) => value && value.trim().length > 0)
+      .filter(([, value]) => value !== dateValue && value !== description)
+      .filter(([, value]) => parseLocaleNumber(value) === null || value === row.raw_values[debitIndex] || value === row.raw_values[creditIndex])
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(" | ");
+
+    return [{
+      date: parsedDate,
+      description,
+      amount,
+      type,
+      category_id: matchCategoryId(description, type, categories),
+      notes,
+    }];
+  });
 }
 
 function parseCsvRows(csvContent: string) {
@@ -370,6 +584,12 @@ export async function POST(request: NextRequest) {
     const validated = sanitizeTransactions(transactions as ParsedAiTransaction[]);
 
     if (validated.length === 0) {
+      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+
+      if (fallbackTransactions.length > 0) {
+        return NextResponse.json({ transactions: fallbackTransactions });
+      }
+
       return NextResponse.json(
         {
           error:
@@ -380,12 +600,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (validated.length < Math.max(3, Math.floor(dataRows.length / 2))) {
-      return NextResponse.json(
-        {
-          error: `Only ${validated.length} transactions were extracted from ${dataRows.length} CSV rows. The parser likely did not understand the file format well enough.`,
-        },
-        { status: 422 }
-      );
+      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+
+      if (fallbackTransactions.length >= validated.length) {
+        return NextResponse.json({ transactions: fallbackTransactions });
+      }
     }
 
     return NextResponse.json({ transactions: validated });
