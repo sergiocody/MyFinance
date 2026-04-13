@@ -23,6 +23,7 @@ DECLARE
   v_uid UUID;
   v_import_id UUID;
   v_count INT;
+  v_missing TEXT;
 BEGIN
 
   -- Auto-detect user (works if you have a single user)
@@ -31,6 +32,18 @@ BEGIN
     RAISE EXCEPTION 'No users found in auth.users. Sign up in the app first.';
   END IF;
   RAISE NOTICE 'Importing data for user %', v_uid;
+
+  -- Cleanup any previous import attempt
+  DELETE FROM transaction_labels WHERE transaction_id IN (
+    SELECT id FROM transactions WHERE import_id IN (
+      SELECT id FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm'
+    )
+  );
+  DELETE FROM transactions WHERE import_id IN (
+    SELECT id FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm'
+  );
+  DELETE FROM imports WHERE user_id = v_uid AND filename = 'firefly_finanzas.xlsm';
+  RAISE NOTICE 'Cleaned up any previous import';
 
   -- Import log
   INSERT INTO imports (user_id, filename, rows_imported, status)
@@ -156,28 +169,19 @@ BEGIN
   ON CONFLICT DO NOTHING;
 
   -- ── Transactions ────────────────────────────────────────
-  INSERT INTO transactions (
-    user_id, account_id, category_id, type, amount,
-    description, notes, date, transfer_to_account_id,
-    import_id, transaction_hash
-  )
-  SELECT
-    v_uid,
-    (SELECT id FROM accounts WHERE user_id = v_uid AND name = v.account_name LIMIT 1),
-    CASE WHEN v.category_name IS NOT NULL
-      THEN (SELECT id FROM categories WHERE user_id = v_uid AND lower(name) = lower(v.category_name) LIMIT 1)
-    END,
-    v.txn_type::text,
-    v.amount,
-    v.description,
-    v.notes,
-    v.txn_date::date,
-    CASE WHEN v.dest_account IS NOT NULL
-      THEN (SELECT id FROM accounts WHERE user_id = v_uid AND name = v.dest_account LIMIT 1)
-    END,
-    v_import_id,
-    v.txn_hash
-  FROM (VALUES
+  CREATE TEMP TABLE _txn_raw (
+    account_name TEXT,
+    category_name TEXT,
+    txn_type TEXT,
+    amount NUMERIC,
+    description TEXT,
+    notes TEXT,
+    txn_date TEXT,
+    dest_account TEXT,
+    txn_hash TEXT
+  );
+
+  INSERT INTO _txn_raw VALUES
     ('Trade Republic', NULL, 'expense', 10.18, 'Intereses', NULL, '2025-10-01', NULL, '2025-10-01|expense|10.18|intereses'),
     ('Trade Republic', 'Intereses_cuenta', 'income', 10.18, 'Intereses TR', NULL, '2025-10-01', NULL, '2025-10-01|income|10.18|intereses tr'),
     ('Trade Republic', 'Helios', 'expense', 0.50, 'Parking', NULL, '2025-10-01', NULL, '2025-10-01|expense|0.50|parking'),
@@ -505,9 +509,55 @@ BEGIN
     ('Revolut', 'Alimentación', 'expense', 0.88, 'Alcampo', NULL, '2026-02-16', NULL, '2026-02-16|expense|0.88|alcampo'),
     ('Renault', 'Intereses_cuenta', 'income', 11.36, 'Intereses Renault', NULL, '2026-02-16', NULL, '2026-02-16|income|11.36|intereses renault'),
     ('Bankinter', 'Traspaso', 'income', 1500.00, 'Traspaso Mapi', NULL, '2026-02-16', NULL, '2026-02-16|income|1500.00|traspaso mapi'),
-    ('Santander', NULL, 'income', 500.00, 'Traspaso Mapi', NULL, '2026-02-16', NULL, '2026-02-16|income|500.00|traspaso mapi')
-  ) AS v(account_name, category_name, txn_type, amount, description, notes, txn_date, dest_account, txn_hash)
-  ON CONFLICT (account_id, transaction_hash) WHERE transaction_hash IS NOT NULL DO NOTHING;
+    ('Santander', NULL, 'income', 500.00, 'Traspaso Mapi', NULL, '2026-02-16', NULL, '2026-02-16|income|500.00|traspaso mapi');
+
+  RAISE NOTICE 'Temp table loaded with % raw rows', (SELECT count(*) FROM _txn_raw);
+
+  -- Now insert into transactions using JOINs (more robust than subqueries)
+  INSERT INTO transactions (
+    user_id, account_id, category_id, type, amount,
+    description, notes, date, transfer_to_account_id,
+    import_id, transaction_hash
+  )
+  SELECT
+    v_uid,
+    a.id,
+    c.id,
+    r.txn_type,
+    r.amount,
+    r.description,
+    r.notes,
+    r.txn_date::date,
+    da.id,
+    v_import_id,
+    r.txn_hash
+  FROM _txn_raw r
+  JOIN accounts a ON a.user_id = v_uid AND a.name = r.account_name
+  LEFT JOIN categories c ON c.user_id = v_uid AND lower(c.name) = lower(r.category_name)
+  LEFT JOIN accounts da ON da.user_id = v_uid AND da.name = r.dest_account
+  WHERE NOT EXISTS (
+    SELECT 1 FROM transactions t
+    WHERE t.account_id = a.id AND t.transaction_hash = r.txn_hash
+  );
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE 'Transactions inserted: %', v_count;
+
+  -- Show any rows that failed the account lookup
+  IF EXISTS (
+    SELECT 1 FROM _txn_raw r
+    WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.user_id = v_uid AND a.name = r.account_name)
+  ) THEN
+    RAISE NOTICE 'WARNING: Some transactions skipped — account name not found:';
+    FOR v_missing IN
+      SELECT DISTINCT r.account_name FROM _txn_raw r
+      WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.user_id = v_uid AND a.name = r.account_name)
+    LOOP
+      RAISE NOTICE '  - missing account: %', v_missing;
+    END LOOP;
+  END IF;
+
+  DROP TABLE _txn_raw;
 
   -- ── Transaction ↔ Label links ──────────────────────────
   INSERT INTO transaction_labels (transaction_id, label_id)
