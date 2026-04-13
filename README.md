@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MyFinance - Personal Finance Tracker
 
-## Getting Started
+A modern personal finance application built with **Next.js**, **Supabase**, and **Google Gemini AI** for smart bank CSV imports.
 
-First, run the development server:
+## Features
+
+- **Authentication** — Email/password sign-in with Supabase Auth
+- **Dashboard** — Overview with balance, income/expense charts, category breakdown
+- **Accounts** — Track multiple bank accounts (checking, savings, credit card, etc.)
+- **Transactions** — Full CRUD with filtering by account, category, type, and date range
+- **Categories** — Organize transactions (Groceries, Transport, Salary, etc.)
+- **Labels** — Tag transactions with custom labels (Essential, Recurring, etc.)
+- **Smart Import** — Drop a bank CSV file, let AI categorize transactions, and automatically skip duplicates
+
+## Tech Stack
+
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
+- **Styling**: Tailwind CSS 4
+- **Database**: Supabase (PostgreSQL)
+- **Charts**: Recharts
+- **AI**: Google Gemini 2.0 Flash
+- **Icons**: Lucide React
+
+## Setup
+
+### 1. Create a Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Go to **Authentication > Providers** and enable **Email**
+3. In **Authentication > URL Configuration**, set your local URL to `http://localhost:3000`
+4. Go to **SQL Editor** and run these migrations in order:
+	- `supabase/migrations/001_initial_schema.sql`
+	- `supabase/migrations/002_auth_and_duplicates.sql`
+5. Copy your project URL and anon key from **Settings > API**
+
+### 2. Get a Gemini API Key
+
+Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API key
+
+### 3. Configure Environment
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
+# Edit .env.local with your Supabase URL, anon key, and Gemini API key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 4. Install and Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+## Deploy to Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Push code to GitHub
+2. Import in [Vercel](https://vercel.com)
+3. Add these environment variables in the Vercel project settings:
+	- `NEXT_PUBLIC_SUPABASE_URL`
+	- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+	- `GEMINI_API_KEY`
+4. In Supabase **Authentication > URL Configuration**, add your Vercel production URL as the site URL and redirect URL
+5. Deploy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Duplicate protection is enforced in two places: the import review screen and the database unique index on `(account_id, transaction_hash)`.
+- If Supabase email confirmation is enabled, new users must confirm their email before they can sign in.
