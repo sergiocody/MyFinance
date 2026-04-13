@@ -313,9 +313,23 @@ function parseTransactionsDeterministically(
   const { dateIndex, descriptionIndex, amountIndex, debitIndex, creditIndex } =
     detectColumnIndexes(header, dataRows);
 
+  console.log("[fallback] column indexes:", { dateIndex, descriptionIndex, amountIndex, debitIndex, creditIndex });
+  console.log("[fallback] header:", header);
+
   return dataRows.flatMap((row) => {
-    const dateValue = dateIndex >= 0 ? row.raw_values[dateIndex] ?? "" : row.raw_values.find(parseDateValue) ?? "";
-    const parsedDate = parseDateValue(dateValue);
+    // Strategy 1: use detected date column; Strategy 2: scan all columns for a parseable date
+    let parsedDate: string | null = null;
+    let dateValue = "";
+    if (dateIndex >= 0) {
+      dateValue = row.raw_values[dateIndex] ?? "";
+      parsedDate = parseDateValue(dateValue);
+    }
+    if (!parsedDate) {
+      for (const value of row.raw_values) {
+        const d = parseDateValue(value);
+        if (d) { parsedDate = d; dateValue = value; break; }
+      }
+    }
     if (!parsedDate) {
       return [];
     }
@@ -323,13 +337,18 @@ function parseTransactionsDeterministically(
     let rawAmount: number | null = null;
     let type: "income" | "expense" = "expense";
 
+    // Strategy 1: use detected amount column
     if (amountIndex >= 0) {
       rawAmount = parseLocaleNumber(row.raw_values[amountIndex] ?? "");
-      if (rawAmount === null || rawAmount === 0) {
-        return [];
+      if (rawAmount !== null && rawAmount !== 0) {
+        type = rawAmount > 0 ? "income" : "expense";
+      } else {
+        rawAmount = null;
       }
-      type = rawAmount > 0 ? "income" : "expense";
-    } else {
+    }
+
+    // Strategy 2: use debit/credit columns
+    if (rawAmount === null) {
       const debitAmount = debitIndex >= 0 ? parseLocaleNumber(row.raw_values[debitIndex] ?? "") : null;
       const creditAmount = creditIndex >= 0 ? parseLocaleNumber(row.raw_values[creditIndex] ?? "") : null;
 
@@ -339,9 +358,24 @@ function parseTransactionsDeterministically(
       } else if (debitAmount && debitAmount !== 0) {
         rawAmount = -Math.abs(debitAmount);
         type = "expense";
-      } else {
-        return [];
       }
+    }
+
+    // Strategy 3: scan any numeric column (skip the date column)
+    if (rawAmount === null) {
+      for (let i = 0; i < row.raw_values.length; i++) {
+        if (i === dateIndex || i === descriptionIndex) continue;
+        const val = parseLocaleNumber(row.raw_values[i] ?? "");
+        if (val !== null && val !== 0) {
+          rawAmount = val;
+          type = val > 0 ? "income" : "expense";
+          break;
+        }
+      }
+    }
+
+    if (rawAmount === null || rawAmount === 0) {
+      return [];
     }
 
     const amount = Math.abs(rawAmount);
@@ -599,10 +633,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (validated.length < Math.max(3, Math.floor(dataRows.length / 2))) {
-      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+    const fallbackThreshold = Math.max(3, Math.floor(dataRows.length / 2));
+    console.log(`[parse] AI validated=${validated.length}, dataRows=${dataRows.length}, fallbackThreshold=${fallbackThreshold}`);
 
-      if (fallbackTransactions.length >= validated.length) {
+    if (validated.length < fallbackThreshold) {
+      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+      console.log(`[parse] fallback got=${fallbackTransactions.length}`);
+
+      // Use fallback if it extracts more, or if AI got 0
+      if (fallbackTransactions.length > validated.length || validated.length === 0) {
         return NextResponse.json({ transactions: fallbackTransactions });
       }
     }
