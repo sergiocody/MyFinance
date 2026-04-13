@@ -42,13 +42,15 @@ export default function ImportPage() {
   const parserLabel = parserProvider === "ollama" ? "Ollama Gemma" : "Gemini";
 
   const currentAccount = accounts.find((a) => a.id === selectedAccount);
+  const currentAccountId = currentAccount?.id ?? null;
+  const currentAccountBalance = currentAccount?.current_balance ?? null;
 
   // When account changes, reset override to its stored balance
   useEffect(() => {
-    if (currentAccount) {
-      setBalanceOverride(String(currentAccount.current_balance));
+    if (currentAccountBalance !== null) {
+      setBalanceOverride(String(currentAccountBalance));
     }
-  }, [currentAccount?.id]);
+  }, [currentAccountId, currentAccountBalance]);
 
   const baseBalance = parseFloat(balanceOverride) || 0;
   const projectedBalance = currentAccount
@@ -268,6 +270,11 @@ export default function ImportPage() {
     setTransactions([]);
     setFileName("");
     setError("");
+    setEditingBalance(false);
+
+    if (currentAccountBalance !== null) {
+      setBalanceOverride(String(currentAccountBalance));
+    }
   }
 
   return (
