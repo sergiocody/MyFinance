@@ -6,17 +6,26 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import { createTransactionHash, formatCurrency, formatDate } from "@/lib/utils";
 import { Upload, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
-import type { Account, Category } from "@/lib/database.types";
+import type { Account, Category, Label } from "@/lib/database.types";
 
-interface ParsedTransaction {
+type TransferRole = "source" | "destination";
+
+type ParsedTransactionDraft = {
   date: string;
   description: string;
   amount: number;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   category_id: string | null;
+  label_ids: string[];
+  transfer_account_id: string | null;
+  selected_account_role: TransferRole | null;
   notes: string;
+};
+
+interface ParsedTransaction extends ParsedTransactionDraft {
   hash: string;
   duplicateSource: "existing" | "file" | null;
+  validationError: string | null;
   selected: boolean;
 }
 
@@ -27,14 +36,148 @@ type ImportStep = "upload" | "parsing" | "review" | "importing" | "done";
 type PersistedTransactionRow = {
   account_id: string;
   category_id: string | null;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   amount: number;
   description: string;
   notes: string | null;
   date: string;
   transaction_hash: string;
+  transfer_to_account_id: string | null;
   import_id: string | null;
 };
+
+function buildTransferFingerprint(
+  date: string,
+  amount: number,
+  accountId: string,
+  transferToAccountId: string
+) {
+  return [date, Number(amount).toFixed(2), accountId, transferToAccountId].join("|");
+}
+
+function getTransactionValidationError(
+  transaction: ParsedTransactionDraft,
+  selectedAccountId: string
+) {
+  if (transaction.type !== "transfer") {
+    return null;
+  }
+
+  if (!transaction.transfer_account_id) {
+    return "Select the other account for this transfer";
+  }
+
+  if (!transaction.selected_account_role) {
+    return "Choose whether this transfer is incoming or outgoing";
+  }
+
+  if (transaction.transfer_account_id === selectedAccountId) {
+    return "Transfer account must be different from the imported account";
+  }
+
+  return null;
+}
+
+function getTransferAccounts(transaction: ParsedTransactionDraft, selectedAccountId: string) {
+  if (
+    transaction.type !== "transfer" ||
+    !transaction.transfer_account_id ||
+    !transaction.selected_account_role
+  ) {
+    return null;
+  }
+
+  return transaction.selected_account_role === "destination"
+    ? {
+        account_id: transaction.transfer_account_id,
+        transfer_to_account_id: selectedAccountId,
+      }
+    : {
+        account_id: selectedAccountId,
+        transfer_to_account_id: transaction.transfer_account_id,
+      };
+}
+
+function getSelectedAccountDelta(transaction: ParsedTransactionDraft) {
+  if (transaction.type === "income") {
+    return transaction.amount;
+  }
+
+  if (transaction.type === "expense") {
+    return -transaction.amount;
+  }
+
+  if (transaction.selected_account_role === "destination") {
+    return transaction.amount;
+  }
+
+  return -transaction.amount;
+}
+
+function hydrateTransactions(
+  drafts: ParsedTransactionDraft[],
+  selectedAccountId: string,
+  existingHashes: Set<string>,
+  existingTransferFingerprints: Set<string>
+) {
+  const seenHashes = new Set<string>();
+  const seenTransferFingerprints = new Set<string>();
+
+  return drafts.map((transaction) => {
+    const previousSelected =
+      "selected" in transaction && typeof transaction.selected === "boolean"
+        ? transaction.selected
+        : undefined;
+    const hash = createTransactionHash({
+      date: transaction.date,
+      type: transaction.type,
+      amount: transaction.amount,
+      description: transaction.description,
+    });
+    const validationError = getTransactionValidationError(transaction, selectedAccountId);
+    let duplicateSource: "existing" | "file" | null = null;
+
+    if (transaction.type === "transfer") {
+      const transferAccounts = getTransferAccounts(transaction, selectedAccountId);
+
+      if (transferAccounts) {
+        const fingerprint = buildTransferFingerprint(
+          transaction.date,
+          transaction.amount,
+          transferAccounts.account_id,
+          transferAccounts.transfer_to_account_id
+        );
+
+        duplicateSource = existingTransferFingerprints.has(fingerprint)
+          ? "existing"
+          : seenTransferFingerprints.has(fingerprint)
+            ? "file"
+            : null;
+
+        seenTransferFingerprints.add(fingerprint);
+      }
+    } else {
+      duplicateSource = existingHashes.has(hash)
+        ? "existing"
+        : seenHashes.has(hash)
+          ? "file"
+          : null;
+
+      seenHashes.add(hash);
+    }
+
+    return {
+      ...transaction,
+      hash,
+      duplicateSource,
+      validationError,
+      selected:
+        validationError !== null
+          ? false
+          : previousSelected ?? duplicateSource === null,
+    };
+  });
+}
 
 function isMissingOnConflictConstraint(error: { message?: string } | null | undefined) {
   return error?.message?.includes(
@@ -50,11 +193,14 @@ export default function ImportPage() {
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [parserProvider, setParserProvider] = useState<ParserProvider>("gemini");
   const [step, setStep] = useState<ImportStep>("upload");
   const [fileName, setFileName] = useState("");
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
+  const [existingHashes, setExistingHashes] = useState<Set<string>>(new Set());
+  const [existingTransferFingerprints, setExistingTransferFingerprints] = useState<Set<string>>(new Set());
   const [importResult, setImportResult] = useState({ imported: 0, skipped: 0 });
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -79,20 +225,22 @@ export default function ImportPage() {
     ? baseBalance +
       transactions
         .filter((t) => t.selected)
-        .reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0)
+        .reduce((sum, t) => sum + getSelectedAccountDelta(t), 0)
     : null;
 
   useEffect(() => {
     async function load() {
-      const [{ data: accts }, { data: cats }] = await Promise.all([
+      const [{ data: accts }, { data: cats }, { data: lbls }] = await Promise.all([
         supabase.from("accounts").select("*").eq("is_active", true).order("name"),
         supabase.from("categories").select("*").order("name"),
+        supabase.from("labels").select("*").order("name"),
       ]);
       if (accts) {
         setAccounts(accts);
         if (accts.length > 0) setSelectedAccount(accts[0].id);
       }
       if (cats) setCategories(cats);
+      if (lbls) setLabels(lbls);
     }
     load();
   }, []);
@@ -120,21 +268,54 @@ export default function ImportPage() {
       setStep("parsing");
 
       try {
-        const { data: existingTransactions } = await supabase
+        const { data: statementTransactions } = await supabase
           .from("transactions")
-          .select("date, description, amount, type")
-          .eq("account_id", selectedAccount);
+          .select("account_id, transfer_to_account_id, date, description, amount, type")
+          .or(`account_id.eq.${selectedAccount},transfer_to_account_id.eq.${selectedAccount}`);
 
-        const existingHashes = new Set(
-          (existingTransactions ?? []).map((transaction) =>
-            createTransactionHash({
-              date: transaction.date,
-              type: transaction.type,
-              amount: Number(transaction.amount),
-              description: transaction.description,
-            })
-          )
+        const existingTransactions = (statementTransactions ?? []) as Array<{
+          account_id: string;
+          transfer_to_account_id: string | null;
+          date: string;
+          description: string | null;
+          amount: number;
+          type: "income" | "expense" | "transfer";
+        }>;
+
+        const existingHashesSet = new Set(
+          existingTransactions
+            .filter((transaction) => transaction.account_id === selectedAccount)
+            .map((transaction) =>
+              createTransactionHash({
+                date: transaction.date,
+                type: transaction.type,
+                amount: Number(transaction.amount),
+                description: transaction.description,
+              })
+            )
         );
+
+        const existingTransferFingerprintsSet = new Set(
+          existingTransactions
+            .filter(
+              (transaction) =>
+                transaction.type === "transfer" &&
+                transaction.transfer_to_account_id !== null
+            )
+            .map((transaction) =>
+              buildTransferFingerprint(
+                transaction.date,
+                Number(transaction.amount),
+                transaction.account_id,
+                transaction.transfer_to_account_id as string
+              )
+            )
+        );
+
+        setExistingHashes(existingHashesSet);
+        setExistingTransferFingerprints(existingTransferFingerprintsSet);
+
+        const otherAccounts = accounts.filter((account) => account.id !== selectedAccount);
 
         const response = await fetch("/api/import/parse", {
           method: "POST",
@@ -145,7 +326,17 @@ export default function ImportPage() {
           body: JSON.stringify({
             csvContent: text,
             categories: categories.map((c) => ({ id: c.id, name: c.name, type: c.type })),
+            labels: labels.map((label) => ({ id: label.id, name: label.name })),
+            accounts: otherAccounts.map((account) => ({
+              id: account.id,
+              name: account.name,
+              bank_name: account.bank_name,
+              type: account.type,
+            })),
             accountId: selectedAccount,
+            selectedAccountName: currentAccount
+              ? `${currentAccount.name}${currentAccount.bank_name ? ` (${currentAccount.bank_name})` : ""}`
+              : selectedAccount,
             provider: parserProvider,
           }),
         });
@@ -157,32 +348,13 @@ export default function ImportPage() {
 
         const { transactions: parsed } = await response.json();
 
-        const seenHashes = new Set<string>();
-
         setTransactions(
-          parsed.map((t: Omit<ParsedTransaction, "selected" | "hash" | "duplicateSource">) => {
-            const hash = createTransactionHash({
-              date: t.date,
-              type: t.type,
-              amount: t.amount,
-              description: t.description,
-            });
-
-            const duplicateSource = existingHashes.has(hash)
-              ? "existing"
-              : seenHashes.has(hash)
-                ? "file"
-                : null;
-
-            seenHashes.add(hash);
-
-            return {
-              ...t,
-              hash,
-              duplicateSource,
-              selected: duplicateSource === null,
-            };
-          })
+          hydrateTransactions(
+            parsed as ParsedTransactionDraft[],
+            selectedAccount,
+            existingHashesSet,
+            existingTransferFingerprintsSet
+          )
         );
         setStep("review");
       } catch (err) {
@@ -190,7 +362,15 @@ export default function ImportPage() {
         setStep("upload");
       }
     },
-    [selectedAccount, categories, parserProvider, session?.access_token]
+    [
+      selectedAccount,
+      currentAccount,
+      categories,
+      labels,
+      accounts,
+      parserProvider,
+      session?.access_token,
+    ]
   );
 
   function handleDrop(e: React.DragEvent) {
@@ -230,90 +410,90 @@ export default function ImportPage() {
 
       importLogId = importLog.id;
 
-      // Insert transactions in batches
-      const batchSize = 50;
       let imported = 0;
       let failed = 0;
       let ignoredDuplicates = 0;
       const failureMessages: string[] = [];
 
-      for (let i = 0; i < selected.length; i += batchSize) {
-        const batch: PersistedTransactionRow[] = selected.slice(i, i + batchSize).map((t) => ({
-          account_id: selectedAccount,
-          category_id: t.category_id,
-          type: t.type,
-          amount: t.amount,
-          description: t.description,
-          notes: t.notes || null,
-          date: t.date,
-          transaction_hash: t.hash,
-          import_id: importLogId,
-        }));
+      for (const transaction of selected) {
+        if (transaction.type === "transfer" && transaction.duplicateSource === "existing") {
+          ignoredDuplicates += 1;
+          continue;
+        }
 
-        let batchResult;
+        const transferAccounts = getTransferAccounts(transaction, selectedAccount);
+
+        const row: PersistedTransactionRow = {
+          account_id: transferAccounts?.account_id ?? selectedAccount,
+          category_id: transaction.category_id,
+          type: transaction.type,
+          amount: transaction.amount,
+          description: transaction.description,
+          notes: transaction.notes || null,
+          date: transaction.date,
+          transaction_hash: transaction.hash,
+          transfer_to_account_id: transferAccounts?.transfer_to_account_id ?? null,
+          import_id: importLogId,
+        };
+
+        let result;
 
         if (useInsertFallback) {
-          batchResult = await supabase.from("transactions").insert(batch).select("id");
+          result = await supabase.from("transactions").insert([row]).select("id");
         } else {
-          batchResult = await supabase
+          result = await supabase
             .from("transactions")
-            .upsert(batch, {
+            .upsert([row], {
               onConflict: "account_id,transaction_hash",
               ignoreDuplicates: true,
             })
             .select("id");
         }
 
-        if (!useInsertFallback && isMissingOnConflictConstraint(batchResult.error)) {
+        if (!useInsertFallback && isMissingOnConflictConstraint(result.error)) {
           useInsertFallback = true;
-          batchResult = await supabase.from("transactions").insert(batch).select("id");
+          result = await supabase.from("transactions").insert([row]).select("id");
         }
 
-        if (!batchResult.error) {
-          const insertedCount = batchResult.data?.length ?? 0;
-          imported += insertedCount;
-          ignoredDuplicates += Math.max(0, batch.length - insertedCount);
+        if (isDuplicateKeyError(result.error)) {
+          ignoredDuplicates += 1;
           continue;
         }
 
-        for (const row of batch) {
-          let singleResult;
+        if (result.error) {
+          failed += 1;
 
-          if (useInsertFallback) {
-            singleResult = await supabase.from("transactions").insert([row]).select("id");
-          } else {
-            singleResult = await supabase
-              .from("transactions")
-              .upsert([row], {
-                onConflict: "account_id,transaction_hash",
-                ignoreDuplicates: true,
-              })
-              .select("id");
+          if (failureMessages.length < 3) {
+            failureMessages.push(`${row.date} · ${row.description}: ${result.error.message}`);
           }
 
-          if (!useInsertFallback && isMissingOnConflictConstraint(singleResult.error)) {
-            useInsertFallback = true;
-            singleResult = await supabase.from("transactions").insert([row]).select("id");
-          }
+          continue;
+        }
 
-          if (isDuplicateKeyError(singleResult.error)) {
-            ignoredDuplicates += 1;
-            continue;
-          }
+        const inserted = result.data?.[0];
 
-          if (singleResult.error) {
+        if (!inserted) {
+          ignoredDuplicates += 1;
+          continue;
+        }
+
+        imported += 1;
+
+        if (transaction.label_ids.length > 0) {
+          const { error: labelError } = await supabase.from("transaction_labels").insert(
+            transaction.label_ids.map((labelId) => ({
+              transaction_id: inserted.id,
+              label_id: labelId,
+            }))
+          );
+
+          if (labelError) {
             failed += 1;
 
             if (failureMessages.length < 3) {
-              failureMessages.push(`${row.date} · ${row.description}: ${singleResult.error.message}`);
+              failureMessages.push(`${row.date} · ${row.description} labels: ${labelError.message}`);
             }
-
-            continue;
           }
-
-          const insertedCount = singleResult.data?.length ?? 0;
-          imported += insertedCount;
-          ignoredDuplicates += Math.max(0, 1 - insertedCount);
         }
       }
 
@@ -358,30 +538,111 @@ export default function ImportPage() {
 
   function toggleTransaction(index: number) {
     setTransactions((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, selected: !t.selected } : t))
+      prev.map((t, i) =>
+        i === index && !t.validationError ? { ...t, selected: !t.selected } : t
+      )
     );
   }
 
   function toggleAll() {
-    const allSelected = transactions.every((t) => t.selected);
-    setTransactions((prev) => prev.map((t) => ({ ...t, selected: !allSelected })));
+    const selectableTransactions = transactions.filter((t) => !t.validationError);
+    const allSelected =
+      selectableTransactions.length > 0 && selectableTransactions.every((t) => t.selected);
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.validationError ? t : { ...t, selected: !allSelected }))
+    );
   }
 
   function updateCategory(index: number, categoryId: string) {
     setTransactions((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, category_id: categoryId || null } : t))
+      hydrateTransactions(
+        prev.map((t, i) =>
+          i === index ? { ...t, category_id: categoryId || null } : t
+        ),
+        selectedAccount,
+        existingHashes,
+        existingTransferFingerprints
+      )
     );
   }
 
-  function updateType(index: number, type: "income" | "expense") {
+  function updateType(index: number, type: "income" | "expense" | "transfer") {
     setTransactions((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, type } : t))
+      hydrateTransactions(
+        prev.map((t, i) => {
+          if (i !== index) {
+            return t;
+          }
+
+          const selectedAccountRole =
+            type === "transfer"
+              ? t.type === "income"
+                ? "destination"
+                : t.type === "expense"
+                  ? "source"
+                  : t.selected_account_role
+              : null;
+
+          return {
+            ...t,
+            type,
+            category_id: type === "transfer" ? null : t.category_id,
+            transfer_account_id: type === "transfer" ? t.transfer_account_id : null,
+            selected_account_role: selectedAccountRole,
+          };
+        }),
+        selectedAccount,
+        existingHashes,
+        existingTransferFingerprints
+      )
+    );
+  }
+
+  function updateTransferAccount(index: number, transferAccountId: string) {
+    setTransactions((prev) =>
+      hydrateTransactions(
+        prev.map((t, i) =>
+          i === index ? { ...t, transfer_account_id: transferAccountId || null } : t
+        ),
+        selectedAccount,
+        existingHashes,
+        existingTransferFingerprints
+      )
+    );
+  }
+
+  function updateTransferRole(index: number, role: TransferRole) {
+    setTransactions((prev) =>
+      hydrateTransactions(
+        prev.map((t, i) =>
+          i === index ? { ...t, selected_account_role: role } : t
+        ),
+        selectedAccount,
+        existingHashes,
+        existingTransferFingerprints
+      )
+    );
+  }
+
+  function updateLabels(index: number, labelIds: string[]) {
+    setTransactions((prev) =>
+      hydrateTransactions(
+        prev.map((t, i) =>
+          i === index ? { ...t, label_ids: labelIds } : t
+        ),
+        selectedAccount,
+        existingHashes,
+        existingTransferFingerprints
+      )
     );
   }
 
   function reset() {
     setStep("upload");
     setTransactions([]);
+    setExistingHashes(new Set());
+    setExistingTransferFingerprints(new Set());
     setFileName("");
     setError("");
     setEditingBalance(false);
@@ -603,7 +864,10 @@ export default function ImportPage() {
                   <th className="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={transactions.every((t) => t.selected)}
+                      checked={
+                        transactions.filter((t) => !t.validationError).length > 0 &&
+                        transactions.filter((t) => !t.validationError).every((t) => t.selected)
+                      }
                       onChange={toggleAll}
                       className="rounded"
                     />
@@ -612,7 +876,9 @@ export default function ImportPage() {
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Transfer</th>
                   <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Labels</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
@@ -626,6 +892,7 @@ export default function ImportPage() {
                       <input
                         type="checkbox"
                         checked={tx.selected}
+                        disabled={Boolean(tx.validationError)}
                         onChange={() => toggleTransaction(i)}
                         className="rounded"
                       />
@@ -638,9 +905,17 @@ export default function ImportPage() {
                       {tx.notes && <p className="text-xs text-gray-400">{tx.notes}</p>}
                     </td>
                     <td className="px-4 py-3">
-                      {tx.duplicateSource ? (
+                      {tx.validationError ? (
+                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800">
+                          {tx.validationError}
+                        </span>
+                      ) : tx.duplicateSource ? (
                         <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
-                          {tx.duplicateSource === "existing" ? "Already imported" : "Repeated in file"}
+                          {tx.type === "transfer" && tx.duplicateSource === "existing"
+                            ? "Already reflected"
+                            : tx.duplicateSource === "existing"
+                              ? "Already imported"
+                              : "Repeated in file"}
                         </span>
                       ) : (
                         <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
@@ -651,16 +926,51 @@ export default function ImportPage() {
                     <td className="px-4 py-3">
                       <select
                         value={tx.type}
-                        onChange={(e) => updateType(i, e.target.value as "income" | "expense")}
+                        onChange={(e) =>
+                          updateType(i, e.target.value as "income" | "expense" | "transfer")
+                        }
                         className={`rounded border px-2 py-1 text-xs font-medium ${
                           tx.type === "income"
                             ? "border-green-200 bg-green-50 text-green-700"
-                            : "border-red-200 bg-red-50 text-red-700"
+                            : tx.type === "expense"
+                              ? "border-red-200 bg-red-50 text-red-700"
+                              : "border-blue-200 bg-blue-50 text-blue-700"
                         }`}
                       >
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
+                        <option value="transfer">Transfer</option>
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {tx.type === "transfer" ? (
+                        <div className="space-y-2">
+                          <select
+                            value={tx.transfer_account_id ?? ""}
+                            onChange={(e) => updateTransferAccount(i, e.target.value)}
+                            className="min-w-40 rounded border border-gray-200 px-2 py-1 text-xs"
+                          >
+                            <option value="">Select account</option>
+                            {accounts
+                              .filter((account) => account.id !== selectedAccount)
+                              .map((account) => (
+                                <option key={account.id} value={account.id}>
+                                  {account.name}
+                                </option>
+                              ))}
+                          </select>
+                          <select
+                            value={tx.selected_account_role ?? "source"}
+                            onChange={(e) => updateTransferRole(i, e.target.value as TransferRole)}
+                            className="min-w-32 rounded border border-gray-200 px-2 py-1 text-xs"
+                          >
+                            <option value="source">Outgoing</option>
+                            <option value="destination">Incoming</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <select
@@ -677,10 +987,68 @@ export default function ImportPage() {
                             </option>
                           ))}
                       </select>
+                      {tx.category_id && (
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-indigo-500">
+                          AI suggestion
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        multiple
+                        size={Math.min(3, Math.max(labels.length, 1))}
+                        value={tx.label_ids}
+                        onChange={(e) =>
+                          updateLabels(
+                            i,
+                            Array.from(e.target.selectedOptions, (option) => option.value)
+                          )
+                        }
+                        className="min-w-36 rounded border border-gray-200 px-2 py-1 text-xs"
+                      >
+                        {labels.map((label) => (
+                          <option key={label.id} value={label.id}>
+                            {label.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {tx.label_ids.length === 0 ? (
+                          <span className="text-[11px] text-gray-400">No labels</span>
+                        ) : (
+                          labels
+                            .filter((label) => tx.label_ids.includes(label.id))
+                            .map((label) => (
+                              <span
+                                key={label.id}
+                                className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                style={{ backgroundColor: `${label.color}20`, color: label.color }}
+                              >
+                                {label.name}
+                              </span>
+                            ))
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
-                      <span className={tx.type === "income" ? "text-green-600" : "text-red-600"}>
-                        {tx.type === "income" ? "+" : "-"}
+                      <span
+                        className={
+                          tx.type === "income"
+                            ? "text-green-600"
+                            : tx.type === "expense"
+                              ? "text-red-600"
+                              : tx.selected_account_role === "destination"
+                                ? "text-green-600"
+                                : "text-blue-600"
+                        }
+                      >
+                        {tx.type === "income"
+                          ? "+"
+                          : tx.type === "expense"
+                            ? "-"
+                            : tx.selected_account_role === "destination"
+                              ? "+"
+                              : "→"}
                         {formatCurrency(tx.amount)}
                       </span>
                     </td>

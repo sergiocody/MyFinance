@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType, type Schema } from "@google/generative-ai";
 import Papa from "papaparse";
 
 type ParserProvider = "gemini" | "ollama";
@@ -11,6 +11,20 @@ type CategoryOption = {
   id: string;
 };
 
+type LabelOption = {
+  id: string;
+  name: string;
+};
+
+type AccountOption = {
+  id: string;
+  name: string;
+  bank_name?: string | null;
+  type: string;
+};
+
+type TransferRole = "source" | "destination";
+
 type ParsedAiTransaction = {
   source_row?: unknown;
   date?: unknown;
@@ -18,6 +32,9 @@ type ParsedAiTransaction = {
   amount?: unknown;
   type?: unknown;
   category_id?: unknown;
+  label_ids?: unknown;
+  transfer_account_id?: unknown;
+  selected_account_role?: unknown;
   notes?: unknown;
 };
 
@@ -31,22 +48,28 @@ type ParsedTransaction = {
   date: string;
   description: string;
   amount: number;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   category_id: string | null;
+  label_ids: string[];
+  transfer_account_id: string | null;
+  selected_account_role: TransferRole | null;
   notes: string;
 };
 
 type ParseRequestBody = {
   csvContent?: string;
   categories?: CategoryOption[];
+  labels?: LabelOption[];
+  accounts?: AccountOption[];
   accountId?: string;
+  selectedAccountName?: string;
   provider?: ParserProvider;
 };
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
-const transactionSchema = {
+const transactionSchema: Schema = {
   type: SchemaType.ARRAY,
   items: {
     type: SchemaType.OBJECT,
@@ -57,11 +80,17 @@ const transactionSchema = {
       amount: { type: SchemaType.NUMBER },
       type: { type: SchemaType.STRING },
       category_id: { type: SchemaType.STRING, nullable: true },
+      label_ids: {
+        type: SchemaType.ARRAY,
+        items: { type: SchemaType.STRING },
+      },
+      transfer_account_id: { type: SchemaType.STRING, nullable: true },
+      selected_account_role: { type: SchemaType.STRING, nullable: true },
       notes: { type: SchemaType.STRING },
     },
     required: ["date", "description", "amount", "type", "notes"],
   },
-} as const;
+};
 
 const ollamaTransactionFormat = {
   type: "object",
@@ -77,6 +106,12 @@ const ollamaTransactionFormat = {
           amount: { type: "number" },
           type: { type: "string" },
           category_id: { type: "string" },
+          label_ids: {
+            type: "array",
+            items: { type: "string" },
+          },
+          transfer_account_id: { type: "string" },
+          selected_account_role: { type: "string" },
           notes: { type: "string" },
         },
         required: ["date", "description", "amount", "type", "notes"],
@@ -84,7 +119,7 @@ const ollamaTransactionFormat = {
     },
   },
   required: ["transactions"],
-} as const;
+};
 
 function extractJsonPayload(text: string) {
   const trimmed = text.trim();
@@ -146,7 +181,7 @@ function normalizeTransactionsPayload(payload: unknown) {
 
 function sanitizeCategoryId(
   categoryId: unknown,
-  type: "income" | "expense",
+  type: "income" | "expense" | "transfer",
   categories: CategoryOption[]
 ) {
   if (typeof categoryId !== "string" || categoryId.length === 0) {
@@ -162,9 +197,42 @@ function sanitizeCategoryId(
   return category.id;
 }
 
+function sanitizeLabelIds(labelIds: unknown, labels: LabelOption[]) {
+  if (!Array.isArray(labelIds)) {
+    return [];
+  }
+
+  const validIds = new Set(labels.map((label) => label.id));
+
+  return [...new Set(labelIds)]
+    .filter((labelId): labelId is string => typeof labelId === "string")
+    .filter((labelId) => validIds.has(labelId));
+}
+
+function sanitizeTransferAccountId(
+  transferAccountId: unknown,
+  accounts: AccountOption[]
+) {
+  if (typeof transferAccountId !== "string" || transferAccountId.length === 0) {
+    return null;
+  }
+
+  return accounts.find((account) => account.id === transferAccountId)?.id ?? null;
+}
+
+function sanitizeTransferRole(value: unknown, rawAmount: number): TransferRole {
+  if (value === "source" || value === "destination") {
+    return value;
+  }
+
+  return rawAmount >= 0 ? "destination" : "source";
+}
+
 function sanitizeTransactions(
   transactions: ParsedAiTransaction[],
-  categories: CategoryOption[]
+  categories: CategoryOption[],
+  labels: LabelOption[],
+  accounts: AccountOption[]
 ) {
   return transactions
     .filter((transaction) => {
@@ -173,11 +241,16 @@ function sanitizeTransactions(
     })
     .map((transaction) => {
       const rawAmount = Number(transaction.amount);
-      // Infer type from sign if AI didn't return a valid type
-      const inferredType: "income" | "expense" =
-        transaction.type === "income" ? "income"
+      const inferredType: "income" | "expense" | "transfer" =
+        transaction.type === "transfer" ? "transfer"
+        : transaction.type === "income" ? "income"
         : transaction.type === "expense" ? "expense"
         : rawAmount > 0 ? "income" : "expense";
+
+      const transferRole =
+        inferredType === "transfer"
+          ? sanitizeTransferRole(transaction.selected_account_role, rawAmount)
+          : null;
 
       return {
         date: String(transaction.date),
@@ -185,6 +258,12 @@ function sanitizeTransactions(
         amount: Math.abs(rawAmount),
         type: inferredType,
         category_id: sanitizeCategoryId(transaction.category_id, inferredType, categories),
+        label_ids: sanitizeLabelIds(transaction.label_ids, labels),
+        transfer_account_id:
+          inferredType === "transfer"
+            ? sanitizeTransferAccountId(transaction.transfer_account_id, accounts)
+            : null,
+        selected_account_role: transferRole,
         notes: String(transaction.notes ?? ""),
       };
     });
@@ -294,7 +373,7 @@ function detectColumnIndexes(header: string[], dataRows: StructuredCsvRow[]) {
 
 function matchCategoryId(
   description: string,
-  type: "income" | "expense",
+  type: "income" | "expense" | "transfer",
   categories: CategoryOption[]
 ) {
   const normalizedDescription = normalizeText(description);
@@ -332,10 +411,43 @@ function matchCategoryId(
   return null;
 }
 
+function matchLabelIds(description: string, labels: LabelOption[]) {
+  const normalizedDescription = normalizeText(description);
+
+  return labels
+    .filter((label) => normalizedDescription.includes(normalizeText(label.name)))
+    .map((label) => label.id);
+}
+
+function matchTransferAccountId(
+  description: string,
+  notes: string,
+  accounts: AccountOption[]
+) {
+  const haystack = normalizeText(`${description} ${notes}`);
+  const keywords = ["transfer", "traspaso", "transferencia", "from ", "to "];
+
+  const matchedAccount = accounts.find((account) => {
+    const accountTerms = [account.name, account.bank_name ?? "", account.type]
+      .map(normalizeText)
+      .filter(Boolean);
+
+    return accountTerms.some((term) => haystack.includes(term));
+  });
+
+  if (matchedAccount) {
+    return matchedAccount.id;
+  }
+
+  return keywords.some((keyword) => haystack.includes(keyword)) ? null : null;
+}
+
 function parseTransactionsDeterministically(
   header: string[],
   dataRows: StructuredCsvRow[],
-  categories: CategoryOption[]
+  categories: CategoryOption[],
+  labels: LabelOption[],
+  accounts: AccountOption[]
 ): ParsedTransaction[] {
   const { dateIndex, descriptionIndex, amountIndex, debitIndex, creditIndex } =
     detectColumnIndexes(header, dataRows);
@@ -418,12 +530,25 @@ function parseTransactionsDeterministically(
       .map(([key, value]) => `${key}: ${value}`)
       .join(" | ");
 
+    const transferAccountId = matchTransferAccountId(description, notes, accounts);
+    const isTransfer = transferAccountId !== null;
+    const transactionType: "income" | "expense" | "transfer" = isTransfer ? "transfer" : type;
+    const transferRole =
+      isTransfer
+        ? rawAmount > 0
+          ? "destination"
+          : "source"
+        : null;
+
     return [{
       date: parsedDate,
       description,
       amount,
-      type,
-      category_id: matchCategoryId(description, type, categories),
+      type: transactionType,
+      category_id: matchCategoryId(description, transactionType, categories),
+      label_ids: matchLabelIds(description, labels),
+      transfer_account_id: transferAccountId,
+      selected_account_role: transferRole,
       notes,
     }];
   });
@@ -464,11 +589,27 @@ function parseCsvRows(csvContent: string) {
   };
 }
 
-function buildPrompt(categoryList: string, header: string[], dataRows: StructuredCsvRow[]) {
+function buildPrompt(
+  categoryList: string,
+  labelList: string,
+  accountList: string,
+  selectedAccountName: string,
+  header: string[],
+  dataRows: StructuredCsvRow[]
+) {
   return `You are a financial data parser. Analyze this bank CSV export and extract transactions.
+
+Selected import account:
+${selectedAccountName}
 
 Available categories:
 ${categoryList}
+
+Available labels:
+${labelList}
+
+Other available accounts for transfers:
+${accountList}
 
 CSV header columns:
 ${header.join(" | ")}
@@ -481,9 +622,12 @@ Parse each source row into a transaction. For each transaction, determine:
 1. "date" - in YYYY-MM-DD format. Try common formats: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD.MM.YYYY
 2. "description" - the payee or memo from the bank
 3. "amount" - always positive number. Handle comma as decimal separator (European format) and dot as thousands separator if needed
-4. "type" - "income" if money is received/positive, "expense" if money is spent/negative
+4. "type" - "income", "expense", or "transfer"
 5. "category_id" - match the description to the best category from the list above. Use null if unsure
-6. "notes" - any additional info from the CSV row
+6. "label_ids" - array of label ids that fit the transaction. Use [] if none
+7. "transfer_account_id" - if type is "transfer", choose the other account id from the list above. Use null if unsure
+8. "selected_account_role" - if type is "transfer", return "source" when the selected import account is sending money, or "destination" when the selected import account is receiving money
+9. "notes" - any additional info from the CSV row
 
 Important rules:
 - Return one JSON object per source row that represents a real transaction
@@ -491,11 +635,14 @@ Important rules:
 - Skip only rows that are empty, totals, balances, summaries, or obvious non-transaction metadata
 - If the CSV has separate debit/credit columns, handle accordingly
 - If amount is negative, it's an expense (make amount positive). If positive, it's income.
+- Use type "transfer" only when the movement is clearly between the selected account and another known account or wallet
+- For incoming transfer rows on the selected account, set selected_account_role to "destination"
+- For outgoing transfer rows on the selected account, set selected_account_role to "source"
 - Be smart about category matching: "SUPERMARKET", "LIDL", "MERCADONA" -> Groceries, "UBER", "TAXI", "METRO" -> Transport, etc.
 - Return ONLY a valid JSON array as the top-level value
 
 Example:
-[{"source_row":2,"date":"2024-01-15","description":"LIDL Store","amount":45.30,"type":"expense","category_id":"abc-123","notes":""}]`;
+[{"source_row":2,"date":"2024-01-15","description":"Transfer from N26","amount":45.30,"type":"transfer","category_id":null,"label_ids":[],"transfer_account_id":"acc-123","selected_account_role":"destination","notes":""}]`;
 }
 
 async function parseWithGemini(prompt: string, apiKey: string) {
@@ -584,7 +731,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { csvContent, categories, accountId, provider: requestedProvider } =
+    const {
+      csvContent,
+      categories,
+      labels,
+      accounts,
+      accountId,
+      selectedAccountName,
+      provider: requestedProvider,
+    } =
       (await request.json()) as ParseRequestBody;
 
     provider = requestedProvider === "ollama" ? "ollama" : "gemini";
@@ -617,6 +772,12 @@ export async function POST(request: NextRequest) {
     const categoryList = (categories ?? [])
       .map((c) => `- ${c.name} (${c.type}, id: ${c.id})`)
       .join("\n");
+    const labelList = (labels ?? [])
+      .map((label) => `- ${label.name} (id: ${label.id})`)
+      .join("\n");
+    const accountList = (accounts ?? [])
+      .map((account) => `- ${account.name}${account.bank_name ? ` (${account.bank_name})` : ""} [${account.type}] (id: ${account.id})`)
+      .join("\n");
 
     const { header, dataRows } = parseCsvRows(csvContent);
 
@@ -627,7 +788,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = buildPrompt(categoryList, header, dataRows);
+    const prompt = buildPrompt(
+      categoryList,
+      labelList || "- none",
+      accountList || "- none",
+      selectedAccountName ?? accountId,
+      header,
+      dataRows
+    );
     const rawTransactions =
       provider === "ollama"
         ? await parseWithOllama(prompt)
@@ -644,11 +812,19 @@ export async function POST(request: NextRequest) {
 
     const validated = sanitizeTransactions(
       transactions as ParsedAiTransaction[],
-      categories ?? []
+      categories ?? [],
+      labels ?? [],
+      accounts ?? []
     );
 
     if (validated.length === 0) {
-      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+      const fallbackTransactions = parseTransactionsDeterministically(
+        header,
+        dataRows,
+        categories ?? [],
+        labels ?? [],
+        accounts ?? []
+      );
 
       if (fallbackTransactions.length > 0) {
         return NextResponse.json({ transactions: fallbackTransactions });
@@ -667,7 +843,13 @@ export async function POST(request: NextRequest) {
     console.log(`[parse] AI validated=${validated.length}, dataRows=${dataRows.length}, fallbackThreshold=${fallbackThreshold}`);
 
     if (validated.length < fallbackThreshold) {
-      const fallbackTransactions = parseTransactionsDeterministically(header, dataRows, categories ?? []);
+      const fallbackTransactions = parseTransactionsDeterministically(
+        header,
+        dataRows,
+        categories ?? [],
+        labels ?? [],
+        accounts ?? []
+      );
       console.log(`[parse] fallback got=${fallbackTransactions.length}`);
 
       // Use fallback if it extracts more, or if AI got 0
