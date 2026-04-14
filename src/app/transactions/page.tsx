@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
@@ -12,6 +13,8 @@ const PAGE_SIZE = 20;
 
 export default function TransactionsPage() {
   type TransactionFilterType = "" | "income" | "expense" | "transfer";
+  const searchParams = useSearchParams();
+  const accountParam = searchParams.get("account") ?? "";
 
   const [transactions, setTransactions] = useState<TransactionWithRelations[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -24,12 +27,12 @@ export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
 
   // Filters
-  const [filterAccount, setFilterAccount] = useState("");
+  const [filterAccount, setFilterAccount] = useState(accountParam);
   const [filterCategory, setFilterCategory] = useState("");
   const [filterType, setFilterType] = useState<TransactionFilterType>("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(Boolean(accountParam));
   const [formError, setFormError] = useState("");
   const [loadError, setLoadError] = useState("");
 
@@ -58,7 +61,9 @@ export default function TransactionsPage() {
       .order("date", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    if (filterAccount) query = query.eq("account_id", filterAccount);
+    if (filterAccount) {
+      query = query.or(`account_id.eq.${filterAccount},transfer_to_account_id.eq.${filterAccount}`);
+    }
     if (filterCategory) query = query.eq("category_id", filterCategory);
     if (filterType) query = query.eq("type", filterType);
     if (filterDateFrom) query = query.gte("date", filterDateFrom);
