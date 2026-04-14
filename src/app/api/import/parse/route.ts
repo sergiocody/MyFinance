@@ -269,6 +269,29 @@ function sanitizeTransactions(
     });
 }
 
+function enrichTransactions(
+  transactions: ParsedTransaction[],
+  categories: CategoryOption[],
+  labels: LabelOption[],
+  accounts: AccountOption[]
+) {
+  return transactions.map((transaction) => ({
+    ...transaction,
+    category_id:
+      transaction.category_id ??
+      matchCategoryId(transaction.description, transaction.type, categories),
+    label_ids:
+      transaction.label_ids.length > 0
+        ? transaction.label_ids
+        : matchLabelIds(transaction.description, labels),
+    transfer_account_id:
+      transaction.type === "transfer"
+        ? transaction.transfer_account_id ??
+          matchTransferAccountId(transaction.description, transaction.notes, accounts)
+        : null,
+  }));
+}
+
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
@@ -391,6 +414,10 @@ function matchCategoryId(
     { keywords: ["salary", "salario", "nomina"], categoryNames: ["Salario", "Salary"] },
     { keywords: ["uber", "taxi", "metro", "bus", "gasolina", "parking"], categoryNames: ["Transporte", "Transport"] },
     { keywords: ["cafe", "restaurant", "restaurante", "glovo", "comida", "cena"], categoryNames: ["Restaurantes", "Restaurants"] },
+    { keywords: ["mcdonald", "burger king", "tagliatella", "telepizza", "domino"], categoryNames: ["Restaurantes", "Restaurants"] },
+    { keywords: ["cine", "cinema", "palafox", "netflix", "spotify", "hbo"], categoryNames: ["Entretenimiento", "Entertainment", "Subscriptions"] },
+    { keywords: ["amazon", "zara", "adidas", "nike", "shopping"], categoryNames: ["Compras", "Shopping"] },
+    { keywords: ["google pay", "bizum", "paypal", "transfer", "transferencia", "traspaso"], categoryNames: ["Transfer"] },
     { keywords: ["interes"], categoryNames: ["Intereses_cuenta", "Interest"] },
   ];
 
@@ -414,8 +441,29 @@ function matchCategoryId(
 function matchLabelIds(description: string, labels: LabelOption[]) {
   const normalizedDescription = normalizeText(description);
 
-  return labels
+  const directMatches = labels
     .filter((label) => normalizedDescription.includes(normalizeText(label.name)))
+    .map((label) => label.id);
+
+  if (directMatches.length > 0) {
+    return directMatches;
+  }
+
+  const labelKeywordMap: Array<{ keywords: string[]; labelNames: string[] }> = [
+    { keywords: ["netflix", "spotify", "icloud", "subscription", "suscripcion"], labelNames: ["Recurring"] },
+    { keywords: ["mercadona", "lidl", "farmacia", "electric", "agua", "rent"], labelNames: ["Essential"] },
+    { keywords: ["adidas", "amazon", "cine", "restaurant", "tagliatella"], labelNames: ["Discretionary"] },
+    { keywords: ["one-off", "one time", "unico"], labelNames: ["One-time"] },
+  ];
+
+  return labels
+    .filter((label) =>
+      labelKeywordMap.some(
+        (rule) =>
+          rule.labelNames.some((name) => normalizeText(name) === normalizeText(label.name)) &&
+          rule.keywords.some((keyword) => normalizedDescription.includes(keyword))
+      )
+    )
     .map((label) => label.id);
 }
 
@@ -810,21 +858,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validated = sanitizeTransactions(
+    const validated = enrichTransactions(
+      sanitizeTransactions(
       transactions as ParsedAiTransaction[],
+      categories ?? [],
+      labels ?? [],
+      accounts ?? []
+      ),
       categories ?? [],
       labels ?? [],
       accounts ?? []
     );
 
     if (validated.length === 0) {
-      const fallbackTransactions = parseTransactionsDeterministically(
+      const fallbackTransactions = enrichTransactions(parseTransactionsDeterministically(
         header,
         dataRows,
         categories ?? [],
         labels ?? [],
         accounts ?? []
-      );
+      ), categories ?? [], labels ?? [], accounts ?? []);
 
       if (fallbackTransactions.length > 0) {
         return NextResponse.json({ transactions: fallbackTransactions });
@@ -843,13 +896,13 @@ export async function POST(request: NextRequest) {
     console.log(`[parse] AI validated=${validated.length}, dataRows=${dataRows.length}, fallbackThreshold=${fallbackThreshold}`);
 
     if (validated.length < fallbackThreshold) {
-      const fallbackTransactions = parseTransactionsDeterministically(
+      const fallbackTransactions = enrichTransactions(parseTransactionsDeterministically(
         header,
         dataRows,
         categories ?? [],
         labels ?? [],
         accounts ?? []
-      );
+      ), categories ?? [], labels ?? [], accounts ?? []);
       console.log(`[parse] fallback got=${fallbackTransactions.length}`);
 
       // Use fallback if it extracts more, or if AI got 0

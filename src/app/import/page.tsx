@@ -994,27 +994,37 @@ export default function ImportPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        multiple
-                        size={Math.min(3, Math.max(labels.length, 1))}
-                        value={tx.label_ids}
-                        onChange={(e) =>
-                          updateLabels(
-                            i,
-                            Array.from(e.target.selectedOptions, (option) => option.value)
-                          )
-                        }
-                        className="min-w-36 rounded border border-gray-200 px-2 py-1 text-xs"
-                      >
-                        {labels.map((label) => (
-                          <option key={label.id} value={label.id}>
-                            {label.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="mt-1 flex flex-wrap gap-1">
+                      <div className="flex min-w-44 flex-wrap gap-1.5">
+                        {labels.map((label) => {
+                          const selected = tx.label_ids.includes(label.id);
+
+                          return (
+                            <button
+                              key={label.id}
+                              type="button"
+                              onClick={() =>
+                                updateLabels(
+                                  i,
+                                  selected
+                                    ? tx.label_ids.filter((id) => id !== label.id)
+                                    : [...tx.label_ids, label.id]
+                                )
+                              }
+                              className={`rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
+                                selected
+                                  ? "text-white"
+                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                              }`}
+                              style={selected ? { backgroundColor: label.color } : undefined}
+                            >
+                              {label.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
                         {tx.label_ids.length === 0 ? (
-                          <span className="text-[11px] text-gray-400">No labels</span>
+                          <span className="text-[11px] text-gray-400">No labels suggested</span>
                         ) : (
                           labels
                             .filter((label) => tx.label_ids.includes(label.id))
@@ -1029,6 +1039,11 @@ export default function ImportPage() {
                             ))
                         )}
                       </div>
+                      {tx.label_ids.length > 0 && (
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-indigo-500">
+                          Suggested labels
+                        </p>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                       <span
