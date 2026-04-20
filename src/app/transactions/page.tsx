@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
+import { LabelMultiSelect } from "@/components/LabelMultiSelect";
 import Modal from "@/components/Modal";
 import { createTransactionHash, formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
@@ -577,32 +578,11 @@ export default function TransactionsPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Labels</label>
-            <div className="flex flex-wrap gap-2">
-              {labels.map((label) => (
-                <button
-                  key={label.id}
-                  type="button"
-                  onClick={() => {
-                    const ids = form.label_ids.includes(label.id)
-                      ? form.label_ids.filter((id) => id !== label.id)
-                      : [...form.label_ids, label.id];
-                    setForm({ ...form, label_ids: ids });
-                  }}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    form.label_ids.includes(label.id)
-                      ? "text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                  style={
-                    form.label_ids.includes(label.id)
-                      ? { backgroundColor: label.color }
-                      : undefined
-                  }
-                >
-                  {label.name}
-                </button>
-              ))}
-            </div>
+            <LabelMultiSelect
+              labels={labels}
+              selectedIds={form.label_ids}
+              onChange={(labelIds) => setForm({ ...form, label_ids: labelIds })}
+            />
           </div>
 
           {formError && (

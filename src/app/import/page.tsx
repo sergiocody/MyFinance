@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
+import { LabelMultiSelect } from "@/components/LabelMultiSelect";
 import { createTransactionHash, formatCurrency, formatDate } from "@/lib/utils";
-import { Upload, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Upload,
+  XCircle,
+} from "lucide-react";
 import type { Account, Category, Label } from "@/lib/database.types";
 
 type TransferRole = "source" | "destination";
@@ -994,51 +1002,11 @@ export default function ImportPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex min-w-44 flex-wrap gap-1.5">
-                        {labels.map((label) => {
-                          const selected = tx.label_ids.includes(label.id);
-
-                          return (
-                            <button
-                              key={label.id}
-                              type="button"
-                              onClick={() =>
-                                updateLabels(
-                                  i,
-                                  selected
-                                    ? tx.label_ids.filter((id) => id !== label.id)
-                                    : [...tx.label_ids, label.id]
-                                )
-                              }
-                              className={`rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
-                                selected
-                                  ? "text-white"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                              }`}
-                              style={selected ? { backgroundColor: label.color } : undefined}
-                            >
-                              {label.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {tx.label_ids.length === 0 ? (
-                          <span className="text-[11px] text-gray-400">No labels suggested</span>
-                        ) : (
-                          labels
-                            .filter((label) => tx.label_ids.includes(label.id))
-                            .map((label) => (
-                              <span
-                                key={label.id}
-                                className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                style={{ backgroundColor: `${label.color}20`, color: label.color }}
-                              >
-                                {label.name}
-                              </span>
-                            ))
-                        )}
-                      </div>
+                      <LabelMultiSelect
+                        labels={labels}
+                        selectedIds={tx.label_ids}
+                        onChange={(labelIds) => updateLabels(i, labelIds)}
+                      />
                       {tx.label_ids.length > 0 && (
                         <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-indigo-500">
                           Suggested labels
