@@ -18,6 +18,26 @@ import type { Account, Category, Label } from "@/lib/database.types";
 
 type TransferRole = "source" | "destination";
 
+type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen";
+
+const parserOptions: Record<
+  ParserProvider,
+  { label: string; description: string }
+> = {
+  gemini: {
+    label: "Gemini",
+    description: "Uses Google Gemini via GEMINI_API_KEY on the server.",
+  },
+  "ollama-gemma": {
+    label: "Ollama Gemma",
+    description: "Uses your local Ollama model at http://localhost:11434 (default: gemma3:4b).",
+  },
+  "ollama-qwen": {
+    label: "Ollama Qwen",
+    description: "Uses your local Ollama model at http://localhost:11434 (default: qwen3:8b).",
+  },
+};
+
 type ParsedTransactionDraft = {
   date: string;
   description: string;
@@ -36,8 +56,6 @@ interface ParsedTransaction extends ParsedTransactionDraft {
   validationError: string | null;
   selected: boolean;
 }
-
-type ParserProvider = "gemini" | "ollama";
 
 type ImportStep = "upload" | "parsing" | "review" | "importing" | "done";
 
@@ -215,7 +233,7 @@ export default function ImportPage() {
   const [balanceOverride, setBalanceOverride] = useState<string>("");
   const [editingBalance, setEditingBalance] = useState(false);
 
-  const parserLabel = parserProvider === "ollama" ? "Ollama Gemma" : "Gemini";
+  const parserLabel = parserOptions[parserProvider].label;
 
   const currentAccount = accounts.find((a) => a.id === selectedAccount);
   const currentAccountId = currentAccount?.id ?? null;
@@ -702,12 +720,11 @@ export default function ImportPage() {
                 className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="gemini">Gemini</option>
-                <option value="ollama">Ollama Gemma</option>
+                <option value="ollama-gemma">Ollama Gemma (gemma3:4b)</option>
+                <option value="ollama-qwen">Ollama Qwen (qwen3:8b)</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                {parserProvider === "ollama"
-                  ? "Uses your local Ollama model at http://localhost:11434 (default: gemma3:4b)."
-                  : "Uses Google Gemini via GEMINI_API_KEY on the server."}
+                {parserOptions[parserProvider].description}
               </p>
             </div>
 
@@ -746,7 +763,7 @@ export default function ImportPage() {
               <p className="text-sm font-medium text-blue-800">How it works</p>
               <ol className="mt-1 list-inside list-decimal text-xs text-blue-700 space-y-1">
                 <li>Select the account to import into</li>
-                <li>Choose Gemini or Ollama Gemma as the parser</li>
+                <li>Choose Gemini, Ollama Gemma, or Ollama Qwen as the parser</li>
                 <li>Drop your bank CSV export file</li>
                 <li>The selected parser analyzes and categorizes each transaction</li>
                 <li>Review, adjust categories, and confirm</li>

@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType, type Schema } from "@google/generative-ai";
 import Papa from "papaparse";
 
-type ParserProvider = "gemini" | "ollama";
+type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen";
+type RequestedParserProvider = ParserProvider | "ollama";
 
 type CategoryOption = {
   name: string;
@@ -63,11 +64,12 @@ type ParseRequestBody = {
   accounts?: AccountOption[];
   accountId?: string;
   selectedAccountName?: string;
-  provider?: ParserProvider;
+  provider?: RequestedParserProvider;
 };
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
+const OLLAMA_GEMMA_MODEL = process.env.OLLAMA_GEMMA_MODEL ?? process.env.OLLAMA_MODEL ?? "gemma3:4b";
+const OLLAMA_QWEN_MODEL = process.env.OLLAMA_QWEN_MODEL ?? "qwen3:8b";
 
 const transactionSchema: Schema = {
   type: SchemaType.ARRAY,
@@ -120,6 +122,38 @@ const ollamaTransactionFormat = {
   },
   required: ["transactions"],
 };
+
+function isOllamaProvider(provider: ParserProvider): provider is Exclude<ParserProvider, "gemini"> {
+  return provider !== "gemini";
+}
+
+function normalizeProvider(provider: RequestedParserProvider | undefined): ParserProvider {
+  if (provider === "ollama-qwen") {
+    return "ollama-qwen";
+  }
+
+  if (provider === "ollama" || provider === "ollama-gemma") {
+    return "ollama-gemma";
+  }
+
+  return "gemini";
+}
+
+function getProviderLabel(provider: ParserProvider) {
+  if (provider === "ollama-gemma") {
+    return "Ollama Gemma";
+  }
+
+  if (provider === "ollama-qwen") {
+    return "Ollama Qwen";
+  }
+
+  return "Gemini";
+}
+
+function getOllamaModel(provider: Exclude<ParserProvider, "gemini">) {
+  return provider === "ollama-qwen" ? OLLAMA_QWEN_MODEL : OLLAMA_GEMMA_MODEL;
+}
 
 function extractJsonPayload(text: string) {
   const trimmed = text.trim();
@@ -710,14 +744,14 @@ async function parseWithGemini(prompt: string, apiKey: string) {
   return JSON.parse(jsonStr);
 }
 
-async function parseWithOllama(prompt: string) {
+async function parseWithOllama(prompt: string, model: string) {
   const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: OLLAMA_MODEL,
+      model,
       prompt,
       stream: false,
       format: ollamaTransactionFormat,
@@ -790,7 +824,7 @@ export async function POST(request: NextRequest) {
     } =
       (await request.json()) as ParseRequestBody;
 
-    provider = requestedProvider === "ollama" ? "ollama" : "gemini";
+    provider = normalizeProvider(requestedProvider);
 
     if (!csvContent || !accountId) {
       return NextResponse.json(
@@ -803,7 +837,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "GEMINI_API_KEY is missing on the server. Switch to Ollama Gemma or configure Gemini.",
+            "GEMINI_API_KEY is missing on the server. Switch to Ollama Gemma or Ollama Qwen, or configure Gemini.",
         },
         { status: 500 }
       );
@@ -844,10 +878,9 @@ export async function POST(request: NextRequest) {
       header,
       dataRows
     );
-    const rawTransactions =
-      provider === "ollama"
-        ? await parseWithOllama(prompt)
-        : await parseWithGemini(prompt, process.env.GEMINI_API_KEY!);
+    const rawTransactions = isOllamaProvider(provider)
+      ? await parseWithOllama(prompt, getOllamaModel(provider))
+      : await parseWithGemini(prompt, process.env.GEMINI_API_KEY!);
 
     const transactions = normalizeTransactionsPayload(rawTransactions);
 
@@ -919,18 +952,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            provider === "ollama"
-              ? "Ollama returned invalid JSON while parsing this file. Try again or use a smaller/cleaner CSV export."
+            isOllamaProvider(provider)
+              ? `${getProviderLabel(provider)} returned invalid JSON while parsing this file. Try again or use a smaller/cleaner CSV export.`
               : "The AI returned an invalid response while parsing this file. Try again or use a smaller/cleaner CSV export.",
         },
         { status: 502 }
       );
     }
 
-    if (provider === "ollama" && error instanceof TypeError) {
+    if (isOllamaProvider(provider) && error instanceof TypeError) {
       return NextResponse.json(
         {
-          error: `Ollama is not reachable at ${OLLAMA_BASE_URL}. Make sure Ollama is running and model ${OLLAMA_MODEL} is available.`,
+          error: `Ollama is not reachable at ${OLLAMA_BASE_URL}. Make sure Ollama is running and model ${getOllamaModel(provider)} is available.`,
         },
         { status: 502 }
       );
@@ -949,8 +982,8 @@ export async function POST(request: NextRequest) {
     const message =
       error instanceof Error
         ? error.message
-        : provider === "ollama"
-          ? "Failed to parse CSV with Ollama Gemma"
+        : isOllamaProvider(provider)
+          ? `Failed to parse CSV with ${getProviderLabel(provider)}`
           : "Failed to parse CSV with AI";
 
     return NextResponse.json(

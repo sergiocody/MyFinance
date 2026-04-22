@@ -10,7 +10,7 @@ A modern personal finance application built with **Next.js**, **Supabase**, and 
 - **Transactions** — Full CRUD with filtering by account, category, type, and date range
 - **Categories** — Organize transactions (Groceries, Transport, Salary, etc.)
 - **Labels** — Tag transactions with custom labels (Essential, Recurring, etc.)
-- **Smart Import** — Drop a bank CSV file, choose Gemini or local Ollama Gemma, and automatically skip duplicates
+- **Smart Import** — Drop a bank CSV file, choose Gemini, local Ollama Gemma, or local Ollama Qwen, and automatically skip duplicates
 
 ## Tech Stack
 
@@ -18,7 +18,7 @@ A modern personal finance application built with **Next.js**, **Supabase**, and 
 - **Styling**: Tailwind CSS 4
 - **Database**: Supabase (PostgreSQL)
 - **Charts**: Recharts
-- **AI**: Google Gemini 2.0 Flash or local Ollama Gemma
+- **AI**: Google Gemini 2.0 Flash, local Ollama Gemma, or local Ollama Qwen
 - **Icons**: Lucide React
 
 ## Setup
@@ -39,18 +39,20 @@ Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API k
 
 ### 3. Optional: Use Ollama Instead of Gemini
 
-If you prefer local parsing, run Ollama locally with a Gemma model, for example:
+If you prefer local parsing, run Ollama locally with Gemma or Qwen, for example:
 
 ```bash
 ollama pull gemma3:4b
+ollama pull qwen3:8b
 ollama serve
 ```
 
-The import page lets you choose between `Gemini` and `Ollama Gemma`.
+The import page lets you choose between `Gemini`, `Ollama Gemma`, and `Ollama Qwen`.
 By default the app calls:
 
 - `http://127.0.0.1:11434/api/generate`
-- model `gemma3:4b`
+- model `gemma3:4b` for Gemma
+- model `qwen3:8b` for Qwen
 
 ### 4. Configure Environment
 
@@ -65,7 +67,9 @@ Environment variables:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY` for Gemini imports
 - `OLLAMA_BASE_URL` optional, defaults to `http://127.0.0.1:11434`
-- `OLLAMA_MODEL` optional, defaults to `gemma3:4b`
+- `OLLAMA_MODEL` optional legacy fallback for Gemma, defaults to `gemma3:4b`
+- `OLLAMA_GEMMA_MODEL` optional, defaults to `gemma3:4b`
+- `OLLAMA_QWEN_MODEL` optional, defaults to `qwen3:8b`
 
 ### 5. Install and Run
 
