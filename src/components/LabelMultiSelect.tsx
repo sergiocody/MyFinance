@@ -50,7 +50,7 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-52">
+    <div ref={containerRef} className="relative w-full min-w-0">
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <div className="flex min-h-10 flex-wrap items-center gap-1.5 px-2 py-2">
           {selectedLabels.length === 0 ? (
@@ -92,7 +92,7 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
       </div>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white p-1 shadow-lg sm:w-64">
           {labels.length === 0 ? (
             <p className="px-3 py-2 text-xs text-gray-400">No labels available</p>
           ) : (

@@ -1,14 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader, CardTitle } from "@/components/Card";
 import { formatCurrency } from "@/lib/utils";
 import {
+  ArrowDownLeft,
   TrendingUp,
   TrendingDown,
   Wallet,
   ArrowRightLeft,
+  ArrowUpRight,
+  Plus,
 } from "lucide-react";
 import {
   BarChart,
@@ -53,6 +57,30 @@ interface CategorySummary {
   value: number;
   color: string;
 }
+
+const QUICK_TRANSACTION_LINKS = [
+  {
+    href: "/transactions?new=1&flow=expense",
+    label: "Expense",
+    description: "Record spend",
+    icon: ArrowUpRight,
+    className: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+  },
+  {
+    href: "/transactions?new=1&flow=income",
+    label: "Income",
+    description: "Log money in",
+    icon: ArrowDownLeft,
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+  },
+  {
+    href: "/transactions?new=1&flow=transfer",
+    label: "Transfer",
+    description: "Move funds",
+    icon: ArrowRightLeft,
+    className: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100",
+  },
+] as const;
 
 export default function Dashboard() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -163,7 +191,43 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pt-12 lg:pt-0">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Start with a quick expense entry, or jump straight into income and transfer flows.
+            </p>
+          </div>
+          <Link
+            href="/transactions?new=1&flow=expense"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" />
+            New Transaction
+          </Link>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {QUICK_TRANSACTION_LINKS.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-3xl border p-4 transition ${item.className}`}
+              >
+                <span className="mb-3 inline-flex rounded-2xl bg-white/80 p-2 shadow-sm">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-1 block text-xs text-current/80">{item.description}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
