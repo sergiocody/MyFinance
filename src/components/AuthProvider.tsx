@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { isSignUpEnabled, supabase } from "@/lib/supabase";
 
 type SignUpResult = {
   error: string | null;
@@ -55,6 +55,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signUp(email: string, password: string): Promise<SignUpResult> {
+    if (!isSignUpEnabled) {
+      return {
+        error: "Sign up is disabled. Create the account in Supabase Auth and then sign in.",
+        needsEmailConfirmation: false,
+      };
+    }
+
     const { data, error } = await supabase.auth.signUp({ email, password });
 
     return {

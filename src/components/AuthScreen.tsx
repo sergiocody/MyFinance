@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Wallet } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { isSignUpEnabled } from "@/lib/supabase";
 
 type AuthMode = "signin" | "signup";
 
@@ -15,19 +16,21 @@ export default function AuthScreen() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
+  const signUpAvailable = isSignUpEnabled;
+  const isSignUpMode = signUpAvailable && mode === "signup";
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setNotice("");
 
-    if (mode === "signup" && password !== confirmPassword) {
+    if (isSignUpMode && password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
     startTransition(async () => {
-      if (mode === "signin") {
+      if (!isSignUpMode) {
         const signInError = await signIn(email, password);
         if (signInError) {
           setError(signInError);
@@ -67,22 +70,28 @@ export default function AuthScreen() {
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-2 rounded-2xl bg-gray-100 p-1 text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => setMode("signin")}
-            className={mode === "signin" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("signup")}
-            className={mode === "signup" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
-          >
-            Create Account
-          </button>
-        </div>
+        {signUpAvailable ? (
+          <div className="mb-6 grid grid-cols-2 rounded-2xl bg-gray-100 p-1 text-sm font-medium">
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className={mode === "signin" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("signup")}
+              className={mode === "signup" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
+            >
+              Create Account
+            </button>
+          </div>
+        ) : (
+          <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+            Invite-only access is enabled. Create your owner account in Supabase Auth, then sign in here.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -110,7 +119,7 @@ export default function AuthScreen() {
             />
           </div>
 
-          {mode === "signup" && (
+          {isSignUpMode && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Confirm Password</label>
               <input
@@ -138,7 +147,7 @@ export default function AuthScreen() {
             disabled={isPending}
             className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
-            {isPending ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+            {isPending ? "Please wait..." : isSignUpMode ? "Create Account" : "Sign In"}
           </button>
         </form>
       </div>

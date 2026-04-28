@@ -71,6 +71,9 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
 const OLLAMA_GEMMA_MODEL = process.env.OLLAMA_GEMMA_MODEL ?? process.env.OLLAMA_MODEL ?? "gemma3:4b";
 const OLLAMA_QWEN_MODEL = process.env.OLLAMA_QWEN_MODEL ?? "qwen3:8b";
 
+const allowedAuthEmails = parseConfigList(process.env.ALLOWED_AUTH_EMAILS);
+const allowedOrigins = parseConfigList(process.env.ALLOWED_ORIGINS);
+
 const transactionSchema: Schema = {
   type: SchemaType.ARRAY,
   items: {
@@ -122,6 +125,27 @@ const ollamaTransactionFormat = {
   },
   required: ["transactions"],
 };
+
+function parseConfigList(value: string | undefined) {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function isAllowedValue(value: string | null | undefined, allowedValues: Set<string>) {
+  if (allowedValues.size === 0) {
+    return true;
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  return allowedValues.has(value.trim().toLowerCase());
+}
 
 function isOllamaProvider(provider: ParserProvider): provider is Exclude<ParserProvider, "gemini"> {
   return provider !== "gemini";
@@ -799,6 +823,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isAllowedValue(request.headers.get("origin"), allowedOrigins)) {
+      return NextResponse.json({ error: "Origin not allowed" }, { status: 403 });
+    }
+
     if (!accessToken) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -811,6 +839,10 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!isAllowedValue(user.email, allowedAuthEmails)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const {
