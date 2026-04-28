@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${publicSans.variable} ${spaceGrotesk.variable} h-full`}>
         <AppShell>{children}</AppShell>
       </body>

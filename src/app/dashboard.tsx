@@ -273,10 +273,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0">
           <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Income vs Expenses (Last 6 Months)</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,114,120,0.18)" />
                 <XAxis dataKey="month" stroke="#6C7278" />
@@ -289,11 +289,11 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Expenses by Category (This Month)</h3>
           {categoryData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={categoryData}
