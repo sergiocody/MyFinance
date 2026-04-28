@@ -184,7 +184,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-(--color-tertiary) border-t-transparent" />
       </div>
     );
   }
@@ -194,14 +194,15 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="font-label text-[11px] text-(--color-secondary)">Overview</p>
+            <h1 className="mt-2 text-3xl font-semibold text-(--color-primary)">Dashboard</h1>
+            <p className="mt-1 text-sm text-(--color-secondary)">
               Start with a quick expense entry, or jump straight into income and transfer flows.
             </p>
           </div>
           <Link
             href="/transactions?new=1&flow=expense"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="accent-button inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition"
           >
             <Plus className="h-4 w-4" />
             New Transaction
@@ -216,7 +217,7 @@ export default function Dashboard() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-3xl border p-4 transition ${item.className}`}
+                className={`rounded-lg border p-4 transition ${item.className}`}
               >
                 <span className="mb-3 inline-flex rounded-2xl bg-white/80 p-2 shadow-sm">
                   <Icon className="h-4 w-4" />
@@ -233,10 +234,10 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Total Balance</CardTitle>
-            <Wallet className="h-5 w-5 text-indigo-500" />
+            <Wallet className="h-5 w-5 text-(--color-tertiary)" />
           </CardHeader>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalBalance)}</p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="text-2xl font-semibold text-(--color-primary)">{formatCurrency(totalBalance)}</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">
             {accounts.length} active account{accounts.length !== 1 ? "s" : ""}
           </p>
         </Card>
@@ -244,52 +245,52 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Monthly Income</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-(--color-primary)" />
           </CardHeader>
           <p className="text-2xl font-bold text-green-600">{formatCurrency(monthIncome)}</p>
-          <p className="mt-1 text-xs text-gray-500">{format(new Date(), "MMMM yyyy")}</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">{format(new Date(), "MMMM yyyy")}</p>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Monthly Expenses</CardTitle>
-            <TrendingDown className="h-5 w-5 text-red-500" />
+            <TrendingDown className="h-5 w-5 text-(--color-tertiary)" />
           </CardHeader>
           <p className="text-2xl font-bold text-red-600">{formatCurrency(monthExpense)}</p>
-          <p className="mt-1 text-xs text-gray-500">{format(new Date(), "MMMM yyyy")}</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">{format(new Date(), "MMMM yyyy")}</p>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Net This Month</CardTitle>
-            <ArrowRightLeft className="h-5 w-5 text-blue-500" />
+            <ArrowRightLeft className="h-5 w-5 text-(--color-secondary)" />
           </CardHeader>
           <p className={`text-2xl font-bold ${monthIncome - monthExpense >= 0 ? "text-green-600" : "text-red-600"}`}>
             {formatCurrency(monthIncome - monthExpense)}
           </p>
-          <p className="mt-1 text-xs text-gray-500">Income - Expenses</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">Income - Expenses</p>
         </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h3 className="mb-4 text-sm font-medium text-gray-500">Income vs Expenses (Last 6 Months)</h3>
+          <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Income vs Expenses (Last 6 Months)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,114,120,0.18)" />
+                <XAxis dataKey="month" stroke="#6C7278" />
+                <YAxis stroke="#6C7278" />
                 <Tooltip formatter={tooltipCurrency} />
-                <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" fill="#1A1C1E" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" fill="#B8422E" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
         <Card>
-          <h3 className="mb-4 text-sm font-medium text-gray-500">Expenses by Category (This Month)</h3>
+          <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Expenses by Category (This Month)</h3>
           {categoryData.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -312,7 +313,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex h-64 items-center justify-center text-sm text-gray-400">
+            <div className="flex h-64 items-center justify-center text-sm text-(--color-secondary)">
               No expenses this month
             </div>
           )}
@@ -320,26 +321,26 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <h3 className="mb-4 text-sm font-medium text-gray-500">Accounts</h3>
+        <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Accounts</h3>
         {accounts.length > 0 ? (
           <div className="space-y-3">
             {accounts.map((account) => (
-              <div key={account.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+              <div key={account.id} className="flex items-center justify-between rounded-lg border border-(--color-border) bg-white/70 p-3">
                 <div className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full" style={{ backgroundColor: account.color }} />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{account.name}</p>
-                    <p className="text-xs text-gray-500">{account.bank_name ?? account.type}</p>
+                    <p className="text-sm font-medium text-(--color-primary)">{account.name}</p>
+                    <p className="text-xs text-(--color-secondary)">{account.bank_name ?? account.type}</p>
                   </div>
                 </div>
-                <p className={`text-sm font-semibold ${Number(account.current_balance) >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                <p className={`text-sm font-semibold ${Number(account.current_balance) >= 0 ? "text-(--color-primary)" : "text-red-600"}`}>
                   {formatCurrency(Number(account.current_balance))}
                 </p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-gray-400">
+          <div className="py-8 text-center text-sm text-(--color-secondary)">
             No accounts yet. Create one in the Accounts page.
           </div>
         )}

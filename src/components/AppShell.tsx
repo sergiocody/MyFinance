@@ -10,10 +10,11 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 
   if (!hasSupabaseConfig) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-lg rounded-3xl border border-amber-200 bg-white p-8 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900">Supabase configuration missing</h1>
-          <p className="mt-3 text-sm text-gray-600">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="surface-card-strong max-w-lg rounded-lg p-8">
+          <p className="font-label text-[11px] text-[var(--color-secondary)]">Configuration</p>
+          <h1 className="mt-3 text-2xl font-semibold text-[var(--color-primary)]">Supabase configuration missing</h1>
+          <p className="mt-3 text-sm text-[var(--color-secondary)]">
             Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY before using the app.
           </p>
         </div>
@@ -23,8 +24,8 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
       </div>
     );
   }
@@ -36,7 +37,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Sidebar />
-      <main className="lg:pl-64">
+      <main className="min-h-screen lg:pl-64">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
       </main>
     </>

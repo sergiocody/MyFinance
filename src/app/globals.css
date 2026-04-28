@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+ :root {
+  --color-primary: #1a1c1e;
+  --color-secondary: #6c7278;
+  --color-tertiary: #b8422e;
+  --color-neutral: #f7f5f2;
+  --color-surface: rgba(255, 255, 255, 0.76);
+  --color-surface-strong: rgba(255, 255, 255, 0.9);
+  --color-border: rgba(108, 114, 120, 0.18);
+  --shadow-matte: 0 1px 0 rgba(255, 255, 255, 0.72), 0 18px 48px rgba(26, 28, 30, 0.07);
+ }
+
+ html {
+  background: var(--color-neutral);
+ }
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  font-family: var(--font-public-sans), Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(184, 66, 46, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(26, 28, 30, 0.05), transparent 28%),
+    var(--color-neutral);
+  color: var(--color-primary);
+ }
+
+ ::selection {
+  background: rgba(184, 66, 46, 0.18);
+ }
+
+ h1,
+ h2,
+ h3,
+ h4,
+ h5,
+ h6 {
+  letter-spacing: -0.03em;
+ }
+
+ .font-label {
+  font-family: var(--font-space-grotesk), Arial, Helvetica, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+ }
+
+ .surface-card {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-matte);
+  backdrop-filter: blur(10px);
+ }
+
+ .surface-card-strong {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-strong);
+  box-shadow: var(--shadow-matte);
+  backdrop-filter: blur(10px);
+ }
+
+ .accent-button {
+  background: var(--color-tertiary);
+  color: var(--color-neutral);
+ }
+
+ .accent-button:hover {
+  background: #a23a28;
+ }
+
+ .ink-button {
+  background: var(--color-primary);
+  color: var(--color-neutral);
+ }
+
+ .ink-button:hover {
+  background: #111315;
 }

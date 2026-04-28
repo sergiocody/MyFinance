@@ -58,94 +58,95 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#dbeafe,_transparent_38%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-white/60 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(184,66,46,0.12),_transparent_28%),linear-gradient(180deg,_#faf8f4_0%,_#f7f5f2_100%)] px-4 py-10">
+      <div className="surface-card-strong w-full max-w-md rounded-lg p-8">
         <div className="mb-8 flex items-center gap-3">
-          <div className="rounded-2xl bg-indigo-600 p-3 text-white">
+          <div className="rounded-lg bg-[var(--color-primary)] p-3 text-[var(--color-neutral)]">
             <Wallet className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">MyFinance</h1>
-            <p className="text-sm text-gray-500">Private finance tracking with Supabase auth</p>
+            <p className="font-label text-[11px] text-[var(--color-secondary)]">Heritage Access</p>
+            <h1 className="text-2xl font-semibold text-[var(--color-primary)]">MyFinance</h1>
+            <p className="text-sm text-[var(--color-secondary)]">Private finance tracking with Supabase auth</p>
           </div>
         </div>
 
         {signUpAvailable ? (
-          <div className="mb-6 grid grid-cols-2 rounded-2xl bg-gray-100 p-1 text-sm font-medium">
+          <div className="mb-6 grid grid-cols-2 rounded-lg border border-[var(--color-border)] bg-[rgba(26,28,30,0.04)] p-1 text-sm font-medium">
             <button
               type="button"
               onClick={() => setMode("signin")}
-              className={mode === "signin" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
+              className={mode === "signin" ? "rounded-md bg-white px-3 py-2 text-[var(--color-primary)] shadow-sm" : "px-3 py-2 text-[var(--color-secondary)]"}
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => setMode("signup")}
-              className={mode === "signup" ? "rounded-2xl bg-white px-3 py-2 text-gray-900 shadow-sm" : "px-3 py-2 text-gray-500"}
+              className={mode === "signup" ? "rounded-md bg-white px-3 py-2 text-[var(--color-primary)] shadow-sm" : "px-3 py-2 text-[var(--color-secondary)]"}
             >
               Create Account
             </button>
           </div>
         ) : (
-          <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+          <div className="mb-6 rounded-lg border border-[rgba(184,66,46,0.18)] bg-[rgba(184,66,46,0.08)] px-4 py-3 text-sm text-[var(--color-tertiary)]">
             Invite-only access is enabled. Create your owner account in Supabase Auth, then sign in here.
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-primary)] outline-none transition focus:border-[var(--color-tertiary)] focus:ring-2 focus:ring-[rgba(184,66,46,0.14)]"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Password</label>
             <input
               type="password"
               required
               minLength={8}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-primary)] outline-none transition focus:border-[var(--color-tertiary)] focus:ring-2 focus:ring-[rgba(184,66,46,0.14)]"
               placeholder="At least 8 characters"
             />
           </div>
 
           {isSignUpMode && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Confirm Password</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Confirm Password</label>
               <input
                 type="password"
                 required
                 minLength={8}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-primary)] outline-none transition focus:border-[var(--color-tertiary)] focus:ring-2 focus:ring-[rgba(184,66,46,0.14)]"
                 placeholder="Repeat password"
               />
             </div>
           )}
 
           {error && (
-            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-lg border border-[rgba(184,66,46,0.18)] bg-[rgba(184,66,46,0.08)] px-4 py-3 text-sm text-[var(--color-tertiary)]">{error}</div>
           )}
 
           {notice && (
-            <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700">{notice}</div>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[rgba(26,28,30,0.04)] px-4 py-3 text-sm text-[var(--color-primary)]">{notice}</div>
           )}
 
           <button
             type="submit"
             disabled={isPending}
-            className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="accent-button w-full rounded-lg px-4 py-3 text-sm font-semibold disabled:opacity-60"
           >
             {isPending ? "Please wait..." : isSignUpMode ? "Create Account" : "Sign In"}
           </button>
