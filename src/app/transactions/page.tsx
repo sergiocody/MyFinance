@@ -14,10 +14,13 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Check,
+  Copy,
   Filter,
   Landmark,
   Pencil,
   Plus,
+  RotateCcw,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -26,6 +29,15 @@ import type { Account, Category, Label, TransactionWithRelations } from "@/lib/d
 const PAGE_SIZE = 20;
 
 type TransactionFlowType = "expense" | "income" | "transfer";
+type ComposerMode = "create" | "edit" | "duplicate";
+type MobileFilterPicker = "account" | "category" | null;
+
+const FILTER_TYPE_OPTIONS = [
+  { value: "", label: "All" },
+  { value: "expense", label: "Expense" },
+  { value: "income", label: "Income" },
+  { value: "transfer", label: "Transfer" },
+] as const;
 
 const TRANSACTION_TYPE_OPTIONS = [
   {
@@ -180,6 +192,8 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionWithRelations | null>(null);
+  const [composerMode, setComposerMode] = useState<ComposerMode>("create");
+  const [mobileFilterPicker, setMobileFilterPicker] = useState<MobileFilterPicker>(null);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -268,6 +282,7 @@ export default function TransactionsPage() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditing(null);
+    setComposerMode("create");
     setFormError("");
     setForm(buildEmptyForm(accounts, composeFlow));
     setModalOpen(true);
@@ -283,6 +298,7 @@ export default function TransactionsPage() {
   }, [accounts, composeFlow, modalOpen, router, searchParams, shouldOpenComposer]);
 
   function openCreate(type: TransactionFlowType = "expense") {
+    setComposerMode("create");
     setEditing(null);
     setFormError("");
     setForm(buildEmptyForm(accounts, type));
@@ -290,6 +306,7 @@ export default function TransactionsPage() {
   }
 
   function openEdit(tx: TransactionWithRelations) {
+    setComposerMode("edit");
     setEditing(tx);
     setFormError("");
     setForm({
@@ -301,6 +318,24 @@ export default function TransactionsPage() {
       notes: tx.notes ?? "",
       date: tx.date,
       label_ids: tx.transaction_labels?.map((tl) => tl.labels.id) ?? [],
+      transfer_to_account_id: tx.transfer_to_account_id ?? "",
+    });
+    setModalOpen(true);
+  }
+
+  function openDuplicate(tx: TransactionWithRelations) {
+    setComposerMode("duplicate");
+    setEditing(null);
+    setFormError("");
+    setForm({
+      account_id: tx.account_id,
+      category_id: tx.category_id ?? "",
+      type: tx.type,
+      amount: String(tx.amount),
+      description: tx.description ?? "",
+      notes: tx.notes ?? "",
+      date: tx.date,
+      label_ids: tx.transaction_labels?.map((transactionLabel) => transactionLabel.labels.id) ?? [],
       transfer_to_account_id: tx.transfer_to_account_id ?? "",
     });
     setModalOpen(true);
@@ -358,7 +393,9 @@ export default function TransactionsPage() {
     if (transactionResponse.error) {
       setFormError(
         transactionResponse.error.code === "23505"
-          ? "A matching transaction already exists for this account."
+          ? composerMode === "duplicate"
+            ? "This copy matches an existing transaction exactly. Change at least one key detail before saving it as a new row."
+            : "A matching transaction already exists for this account."
           : transactionResponse.error.message
       );
       return;
@@ -394,6 +431,15 @@ export default function TransactionsPage() {
     loadTransactions();
   }
 
+  function resetFilters() {
+    setFilterAccount("");
+    setFilterCategory("");
+    setFilterType("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setPage(0);
+  }
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const filteredCategories = categories.filter((category) => category.type === form.type);
   const selectedAccount = accounts.find((account) => account.id === form.account_id);
@@ -404,22 +450,100 @@ export default function TransactionsPage() {
     "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
   const sectionClassName = "rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5";
   const currentFlow = FLOW_CONTENT[form.type];
+  const actionIconButtonClass =
+    "rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600";
+  const mobileActionButtonClass =
+    "inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900";
+  const filterChipButtonClass =
+    "inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-sm font-medium transition";
+  const mobilePickerButtonClass =
+    "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition hover:border-slate-300 hover:bg-slate-50";
+  const activeFilterCount = [
+    filterAccount,
+    filterCategory,
+    filterType,
+    filterDateFrom,
+    filterDateTo,
+  ].filter(Boolean).length;
+  const activeFilterSummary = [
+    filterAccount ? `Account: ${accounts.find((account) => account.id === filterAccount)?.name ?? "Selected"}` : null,
+    filterCategory ? `Category: ${categories.find((category) => category.id === filterCategory)?.name ?? "Selected"}` : null,
+    filterType ? `Type: ${filterType}` : null,
+    filterDateFrom ? `From ${formatDate(filterDateFrom)}` : null,
+    filterDateTo ? `To ${formatDate(filterDateTo)}` : null,
+  ].filter((value): value is string => Boolean(value));
+  const selectedFilterAccountName = filterAccount
+    ? accounts.find((account) => account.id === filterAccount)?.name ?? "Selected account"
+    : "All accounts";
+  const selectedFilterCategoryName = filterCategory
+    ? categories.find((category) => category.id === filterCategory)?.name ?? "Selected category"
+    : "All categories";
+  const composerTitle =
+    composerMode === "edit"
+      ? "Edit Transaction"
+      : composerMode === "duplicate"
+        ? "Copy Transaction"
+        : "New Transaction";
+  const composerHeading =
+    composerMode === "edit"
+      ? `Update ${form.type}`
+      : composerMode === "duplicate"
+        ? `Copy ${form.type}`
+        : currentFlow.title;
+  const composerSubtitle =
+    composerMode === "edit"
+      ? "Adjust the transaction details and save your changes."
+      : composerMode === "duplicate"
+        ? "This form starts with the same values as the selected row. Review and save it as a new transaction."
+        : currentFlow.subtitle;
+  const composerSubmitLabel =
+    composerMode === "edit"
+      ? "Save changes"
+      : composerMode === "duplicate"
+        ? "Create copied transaction"
+        : currentFlow.submitLabel;
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Browse the ledger, then refine it with quick mobile-friendly filters.
+            </p>
+          </div>
+
+          {!showFilters && activeFilterSummary.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {activeFilterSummary.map((item) => (
+                <span
+                  key={item}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             <Filter size={16} />
             Filters
+            {activeFilterCount > 0 && (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => openCreate("expense")}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             <Plus size={16} />
             New expense
@@ -429,66 +553,118 @@ export default function TransactionsPage() {
 
       {/* Filters */}
       {showFilters && (
-        <Card>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Card className="space-y-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Account</label>
+              <p className="font-label text-[11px] text-slate-500">Refine List</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Filters</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Results update instantly as you narrow down the list.
+              </p>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                <RotateCcw size={14} />
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="font-label block text-[11px] text-slate-500">Type</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {FILTER_TYPE_OPTIONS.map((option) => {
+                const isActive = filterType === option.value;
+
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => {
+                      setFilterType(option.value as TransactionFilterType);
+                      setPage(0);
+                    }}
+                    className={`${filterChipButtonClass} ${
+                      isActive
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="font-label mb-2 block text-[11px] text-slate-500">Account</label>
+              <button
+                type="button"
+                onClick={() => setMobileFilterPicker("account")}
+                className={`${mobilePickerButtonClass} sm:hidden`}
+              >
+                <span>{selectedFilterAccountName}</span>
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Choose</span>
+              </button>
               <select
                 value={filterAccount}
                 onChange={(e) => { setFilterAccount(e.target.value); setPage(0); }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className={`${fieldClassName} hidden sm:block`}
               >
-                <option value="">All</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                <option value="">All accounts</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>{account.name}</option>
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Category</label>
+              <label className="font-label mb-2 block text-[11px] text-slate-500">Category</label>
+              <button
+                type="button"
+                onClick={() => setMobileFilterPicker("category")}
+                className={`${mobilePickerButtonClass} sm:hidden`}
+              >
+                <span>{selectedFilterCategoryName}</span>
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Choose</span>
+              </button>
               <select
                 value={filterCategory}
                 onChange={(e) => { setFilterCategory(e.target.value); setPage(0); }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className={`${fieldClassName} hidden sm:block`}
               >
-                <option value="">All</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                <option value="">All categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => {
-                  setFilterType(e.target.value as TransactionFilterType);
-                  setPage(0);
-                }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">All</option>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-                <option value="transfer">Transfer</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">From</label>
+              <label className="font-label mb-2 block text-[11px] text-slate-500">From</label>
               <input
                 type="date"
                 value={filterDateFrom}
                 onChange={(e) => { setFilterDateFrom(e.target.value); setPage(0); }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className={fieldClassName}
               />
             </div>
+
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
+              <label className="font-label mb-2 block text-[11px] text-slate-500">To</label>
               <input
                 type="date"
                 value={filterDateTo}
                 onChange={(e) => { setFilterDateTo(e.target.value); setPage(0); }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className={fieldClassName}
               />
             </div>
           </div>
@@ -502,7 +678,124 @@ export default function TransactionsPage() {
             Failed to load transactions: {loadError}
           </div>
         )}
-        <table className="w-full text-sm">
+        <div className="md:hidden">
+          {loading ? (
+            <div className="px-4 py-8 text-center text-gray-400">Loading...</div>
+          ) : transactions.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-400">No transactions found</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="space-y-4 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {tx.description || "Untitled transaction"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">{formatDate(tx.date)}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-sm font-semibold ${
+                        tx.type === "income"
+                          ? "text-green-600"
+                          : tx.type === "expense"
+                            ? "text-red-600"
+                            : "text-blue-600"
+                      }`}
+                    >
+                      {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : ""}
+                      {formatCurrency(Number(tx.amount))}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Account</span>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: tx.accounts?.color }}
+                        />
+                        <span>{tx.accounts?.name ?? "-"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Category</span>
+                      {tx.categories ? (
+                        <span
+                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{
+                            backgroundColor: tx.categories.color + "20",
+                            color: tx.categories.color,
+                          }}
+                        >
+                          {tx.categories.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+
+                    {tx.transaction_labels && tx.transaction_labels.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="block text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
+                          Labels
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {tx.transaction_labels.map((transactionLabel) => (
+                            <span
+                              key={transactionLabel.labels.id}
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: transactionLabel.labels.color + "20",
+                                color: transactionLabel.labels.color,
+                              }}
+                            >
+                              {transactionLabel.labels.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {tx.notes && (
+                      <div className="space-y-1">
+                        <span className="block text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
+                          Notes
+                        </span>
+                        <p className="text-xs text-gray-500">{tx.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => openDuplicate(tx)}
+                      className={mobileActionButtonClass}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={() => openEdit(tx)}
+                      className={mobileActionButtonClass}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tx.id)}
+                      className="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <table className="hidden w-full text-sm md:table">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase text-gray-500">
               <th className="px-4 py-3">Date</th>
@@ -596,8 +889,16 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <button
+                        onClick={() => openDuplicate(tx)}
+                        className={actionIconButtonClass}
+                        aria-label="Copy transaction"
+                        title="Copy transaction"
+                      >
+                        <Copy size={14} />
+                      </button>
+                      <button
                         onClick={() => openEdit(tx)}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        className={actionIconButtonClass}
                       >
                         <Pencil size={14} />
                       </button>
@@ -645,7 +946,7 @@ export default function TransactionsPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? "Edit Transaction" : "New Transaction"}
+        title={composerTitle}
         size="lg"
         mobileSheet
         bodyClassName="p-0"
@@ -659,10 +960,10 @@ export default function TransactionsPage() {
                     {currentFlow.eyebrow}
                   </p>
                   <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
-                    {editing ? `Update ${form.type}` : currentFlow.title}
+                    {composerHeading}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    {currentFlow.subtitle}
+                    {composerSubtitle}
                   </p>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm">
@@ -923,11 +1224,85 @@ export default function TransactionsPage() {
                 type="submit"
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                {editing ? "Save changes" : currentFlow.submitLabel}
+                {composerSubmitLabel}
               </button>
             </div>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={mobileFilterPicker !== null}
+        onClose={() => setMobileFilterPicker(null)}
+        title={mobileFilterPicker === "account" ? "Choose account" : "Choose category"}
+        size="sm"
+        mobileSheet
+      >
+        <div className="space-y-2 pb-4">
+          {mobileFilterPicker === "account" && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterAccount("");
+                  setPage(0);
+                  setMobileFilterPicker(null);
+                }}
+                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+              >
+                <span>All accounts</span>
+                {filterAccount === "" && <Check className="h-4 w-4 text-slate-900" />}
+              </button>
+              {accounts.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => {
+                    setFilterAccount(account.id);
+                    setPage(0);
+                    setMobileFilterPicker(null);
+                  }}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                >
+                  <span>{account.name}</span>
+                  {filterAccount === account.id && <Check className="h-4 w-4 text-slate-900" />}
+                </button>
+              ))}
+            </>
+          )}
+
+          {mobileFilterPicker === "category" && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterCategory("");
+                  setPage(0);
+                  setMobileFilterPicker(null);
+                }}
+                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+              >
+                <span>All categories</span>
+                {filterCategory === "" && <Check className="h-4 w-4 text-slate-900" />}
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => {
+                    setFilterCategory(category.id);
+                    setPage(0);
+                    setMobileFilterPicker(null);
+                  }}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                >
+                  <span>{category.name}</span>
+                  {filterCategory === category.id && <Check className="h-4 w-4 text-slate-900" />}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );
