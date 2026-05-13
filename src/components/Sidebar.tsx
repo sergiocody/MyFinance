@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Download,
   LayoutDashboard,
   LogOut,
   Wallet,
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Transactions", href: "/transactions", icon: ArrowRightLeft },
   { name: "Categories", href: "/categories", icon: FolderOpen },
   { name: "Labels", href: "/labels", icon: Tag },
+  { name: "Export", href: "/export", icon: Download },
   { name: "Import", href: "/import", icon: Upload },
 ];
 
