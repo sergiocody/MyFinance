@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
@@ -14,51 +15,173 @@ const COLORS = [
 ];
 
 export default function LabelsPage() {
+  const { user } = useAuth();
   const [labels, setLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Label | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [form, setForm] = useState({ name: "", color: "#8b5cf6" });
 
   async function loadLabels() {
     setLoading(true);
-    const { data } = await supabase.from("labels").select("*").order("name");
+    setPageError("");
+
+    const { data, error } = await supabase.from("labels").select("*").order("name");
+
+    if (error) {
+      setLabels([]);
+      setPageError(error.message);
+      setLoading(false);
+      return;
+    }
+
     if (data) setLabels(data);
     setLoading(false);
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadLabels();
   }, []);
 
   function openCreate() {
     setEditing(null);
+    setFormError("");
     setForm({ name: "", color: "#8b5cf6" });
     setModalOpen(true);
   }
 
   function openEdit(label: Label) {
     setEditing(label);
+    setFormError("");
     setForm({ name: label.name, color: label.color });
     setModalOpen(true);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (editing) {
-      await supabase.from("labels").update({ name: form.name, color: form.color }).eq("id", editing.id);
-    } else {
-      await supabase.from("labels").insert({ name: form.name, color: form.color });
+
+    if (!user) {
+      setFormError("Sign in again before editing labels.");
+      return;
     }
-    setModalOpen(false);
-    loadLabels();
+
+    const payload = {
+      name: form.name.trim(),
+      color: form.color,
+    };
+
+    if (!payload.name) {
+      setFormError("Name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError("");
+
+    try {
+      if (editing?.user_id === null) {
+        const { data: createdLabel, error: insertError } = await supabase
+          .from("labels")
+          .insert({
+            ...payload,
+            user_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        const { data: linkedTransactions, error: linkedTransactionsError } = await supabase
+          .from("transaction_labels")
+          .select("transaction_id")
+          .eq("label_id", editing.id);
+
+        if (linkedTransactionsError) {
+          throw linkedTransactionsError;
+        }
+
+        const transactionIds = (linkedTransactions ?? []).map((item) => item.transaction_id);
+
+        if (transactionIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from("transaction_labels")
+            .delete()
+            .eq("label_id", editing.id);
+
+          if (deleteError) {
+            throw deleteError;
+          }
+
+          const { error: insertLinkedError } = await supabase.from("transaction_labels").insert(
+            transactionIds.map((transactionId) => ({
+              transaction_id: transactionId,
+              label_id: createdLabel.id,
+            }))
+          );
+
+          if (insertLinkedError) {
+            throw insertLinkedError;
+          }
+        }
+      } else if (editing) {
+        const { error } = await supabase
+          .from("labels")
+          .update(payload)
+          .eq("id", editing.id);
+
+        if (error) {
+          throw error;
+        }
+      } else {
+        const { error } = await supabase.from("labels").insert({
+          ...payload,
+          user_id: user.id,
+        });
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      setModalOpen(false);
+      setEditing(null);
+      await loadLabels();
+    } catch (error) {
+      if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+        setFormError("You already have a label with that name.");
+      } else if (error instanceof Error) {
+        setFormError(error.message);
+      } else {
+        setFormError("The label could not be saved.");
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this label?")) return;
-    await supabase.from("labels").delete().eq("id", id);
-    loadLabels();
+
+    const label = labels.find((item) => item.id === id);
+
+    if (label?.user_id === null) {
+      setPageError("Shared default labels cannot be deleted.");
+      return;
+    }
+
+    const { error } = await supabase.from("labels").delete().eq("id", id);
+
+    if (error) {
+      setPageError(error.message);
+      return;
+    }
+
+    await loadLabels();
   }
 
   if (loading) {
@@ -82,13 +205,24 @@ export default function LabelsPage() {
         </button>
       </div>
 
+      {pageError && (
+        <Card>
+          <div className="text-sm text-red-700">{pageError}</div>
+        </Card>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {labels.map((label) => (
           <Card key={label.id}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-4 w-4 rounded-full" style={{ backgroundColor: label.color }} />
-                <span className="font-medium text-gray-900">{label.name}</span>
+                <div>
+                  <span className="font-medium text-gray-900">{label.name}</span>
+                  {label.user_id === null && (
+                    <p className="text-xs text-gray-500">Default label</p>
+                  )}
+                </div>
               </div>
               <div className="flex gap-1">
                 <button
@@ -117,6 +251,19 @@ export default function LabelsPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Label" : "New Label"}>
         <form onSubmit={handleSave} className="space-y-4">
+          {editing?.user_id === null && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              This is a shared default label. Saving will create your own copy and reassign your
+              transaction label links to it.
+            </div>
+          )}
+
+          {formError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {formError}
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
             <input
@@ -145,7 +292,7 @@ export default function LabelsPage() {
             <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
               {editing ? "Update" : "Create"}
             </button>
           </div>

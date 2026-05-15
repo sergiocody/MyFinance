@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
@@ -14,10 +15,14 @@ const COLORS = [
 ];
 
 export default function CategoriesPage() {
+  const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [form, setForm] = useState({
     name: "",
     type: "expense" as Category["type"],
@@ -27,51 +32,140 @@ export default function CategoriesPage() {
 
   async function loadCategories() {
     setLoading(true);
-    const { data } = await supabase.from("categories").select("*").order("type").order("name");
+    setPageError("");
+
+    const { data, error } = await supabase.from("categories").select("*").order("type").order("name");
+
+    if (error) {
+      setCategories([]);
+      setPageError(error.message);
+      setLoading(false);
+      return;
+    }
+
     if (data) setCategories(data);
     setLoading(false);
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadCategories();
   }, []);
 
   function openCreate() {
     setEditing(null);
+    setFormError("");
     setForm({ name: "", type: "expense", icon: "", color: "#6366f1" });
     setModalOpen(true);
   }
 
   function openEdit(cat: Category) {
     setEditing(cat);
+    setFormError("");
     setForm({ name: cat.name, type: cat.type, icon: cat.icon ?? "", color: cat.color });
     setModalOpen(true);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (editing) {
-      await supabase
-        .from("categories")
-        .update({ name: form.name, type: form.type, icon: form.icon || null, color: form.color })
-        .eq("id", editing.id);
-    } else {
-      await supabase.from("categories").insert({
-        name: form.name,
-        type: form.type,
-        icon: form.icon || null,
-        color: form.color,
-      });
+    if (!user) {
+      setFormError("Sign in again before editing categories.");
+      return;
     }
-    setModalOpen(false);
-    loadCategories();
+
+    setSaving(true);
+    setFormError("");
+
+    const payload = {
+      name: form.name.trim(),
+      type: form.type,
+      icon: form.icon.trim() || null,
+      color: form.color,
+    };
+
+    if (!payload.name) {
+      setFormError("Name is required.");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      if (editing?.user_id === null) {
+        const { data: createdCategory, error: insertError } = await supabase
+          .from("categories")
+          .insert({
+            ...payload,
+            user_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        const { error: reassignError } = await supabase
+          .from("transactions")
+          .update({ category_id: createdCategory.id })
+          .eq("category_id", editing.id)
+          .eq("user_id", user.id);
+
+        if (reassignError) {
+          throw reassignError;
+        }
+      } else if (editing) {
+        const { error } = await supabase
+          .from("categories")
+          .update(payload)
+          .eq("id", editing.id);
+
+        if (error) {
+          throw error;
+        }
+      } else {
+        const { error } = await supabase.from("categories").insert({
+          ...payload,
+          user_id: user.id,
+        });
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      setModalOpen(false);
+      setEditing(null);
+      await loadCategories();
+    } catch (error) {
+      if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+        setFormError("You already have a category with that name.");
+      } else if (error instanceof Error) {
+        setFormError(error.message);
+      } else {
+        setFormError("The category could not be saved.");
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this category?")) return;
-    await supabase.from("categories").delete().eq("id", id);
-    loadCategories();
+
+    const category = categories.find((item) => item.id === id);
+
+    if (category?.user_id === null) {
+      setPageError("Shared default categories cannot be deleted.");
+      return;
+    }
+
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+
+    if (error) {
+      setPageError(error.message);
+      return;
+    }
+
+    await loadCategories();
   }
 
   const grouped = {
@@ -101,6 +195,12 @@ export default function CategoriesPage() {
         </button>
       </div>
 
+      {pageError && (
+        <Card>
+          <div className="text-sm text-red-700">{pageError}</div>
+        </Card>
+      )}
+
       {(["income", "expense", "transfer"] as const).map((type) => (
         <div key={type}>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
@@ -115,7 +215,12 @@ export default function CategoriesPage() {
                       className="h-4 w-4 rounded-full"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <span className="font-medium text-gray-900">{cat.name}</span>
+                    <div>
+                      <span className="font-medium text-gray-900">{cat.name}</span>
+                      {cat.user_id === null && (
+                        <p className="text-xs text-gray-500">Default category</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -140,6 +245,19 @@ export default function CategoriesPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Category" : "New Category"}>
         <form onSubmit={handleSave} className="space-y-4">
+          {editing?.user_id === null && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              This is a shared default category. Saving will create your own copy and reassign
+              your transactions that use this category.
+            </div>
+          )}
+
+          {formError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {formError}
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
             <input
@@ -180,7 +298,7 @@ export default function CategoriesPage() {
             <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
               {editing ? "Update" : "Create"}
             </button>
           </div>
