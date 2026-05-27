@@ -1,21 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getRequisition } from "@/lib/gocardless";
+import { createSession } from "@/lib/enablebanking";
 import type { Database } from "@/lib/database.types";
 
 /**
- * GET /api/gocardless/callback?account_id=...&ref=...
- * GoCardless redirects here after the user authorizes the bank connection.
- * Fetches the requisition status and stores the linked account IDs.
+ * GET /api/banking/callback?code=...&state=...
+ * Enable Banking redirects here after the user authorizes the bank connection.
+ * Exchanges the code for a session and stores the linked account UID.
  * Then redirects the user back to the accounts page.
  */
 export async function GET(request: NextRequest) {
-  const accountId = request.nextUrl.searchParams.get("account_id");
+  const code = request.nextUrl.searchParams.get("code");
+  const state = request.nextUrl.searchParams.get("state"); // contains accountId
+  const error = request.nextUrl.searchParams.get("error");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
 
-  if (!accountId) {
-    return NextResponse.redirect(`${appUrl}/accounts?error=missing_account_id`);
+  // Handle user cancellation or errors from the bank
+  if (error) {
+    const errorDesc = request.nextUrl.searchParams.get("error_description") || error;
+    return NextResponse.redirect(`${appUrl}/accounts?error=${encodeURIComponent(errorDesc)}`);
   }
+
+  if (!code || !state) {
+    return NextResponse.redirect(`${appUrl}/accounts?error=missing_callback_params`);
+  }
+
+  const accountId = state;
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -33,15 +43,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/accounts?error=connection_not_found`);
     }
 
-    if (!connection.requisition_id) {
-      return NextResponse.redirect(`${appUrl}/accounts?error=no_requisition`);
-    }
+    // Exchange code for a session
+    const session = await createSession(code);
 
-    // Fetch the requisition from GoCardless to get linked accounts
-    const requisition = await getRequisition(connection.user_id!, connection.requisition_id);
-
-    if (requisition.accounts.length === 0) {
-      // User may have cancelled or bank didn't provide accounts
+    if (!session.accounts || session.accounts.length === 0) {
       await serviceClient
         .from("bank_connections")
         .update({
@@ -54,13 +59,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/accounts?error=no_bank_accounts`);
     }
 
-    // Use the first account (most common single-account scenario)
-    const gocardlessAccountId = requisition.accounts[0];
+    // Use the first account's UID
+    const linkedAccount = session.accounts[0];
+    const accountUid = linkedAccount.uid;
+
+    // Calculate session expiry (default 90 days from now if not available from session data)
+    const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
     await serviceClient
       .from("bank_connections")
       .update({
-        gocardless_account_id: gocardlessAccountId,
+        external_account_uid: accountUid,
+        session_id: session.session_id,
+        session_expires_at: sessionExpiresAt,
         status: "linked",
         error_message: null,
         updated_at: new Date().toISOString(),
@@ -68,9 +79,9 @@ export async function GET(request: NextRequest) {
       .eq("id", connection.id);
 
     return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("GoCardless callback error:", message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Banking callback error:", message);
     return NextResponse.redirect(`${appUrl}/accounts?error=callback_failed`);
   }
 }

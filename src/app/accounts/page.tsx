@@ -202,8 +202,9 @@ const COUNTRIES = [
 type Institution = {
   id: string;
   name: string;
+  country: string;
   logo: string;
-  countries: string[];
+  bic: string | null;
 };
 
 function BankConnectFlow({
@@ -225,7 +226,7 @@ function BankConnectFlow({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch(`/api/gocardless/institutions?country=${countryCode}`, {
+      const res = await fetch(`/api/banking/institutions?country=${countryCode}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
@@ -251,7 +252,7 @@ function BankConnectFlow({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch("/api/gocardless/connect", {
+      const res = await fetch("/api/banking/connect", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -259,14 +260,14 @@ function BankConnectFlow({
         },
         body: JSON.stringify({
           accountId,
-          institutionId: institution.id,
-          institutionName: institution.name,
+          aspspName: institution.name,
+          aspspCountry: institution.country,
         }),
       });
 
       if (res.ok) {
-        const { link } = await res.json();
-        window.location.href = link;
+        const { url } = await res.json();
+        window.location.href = url;
       } else {
         const { error } = await res.json();
         alert(`Connection failed: ${error}`);
@@ -499,7 +500,7 @@ export default function AccountsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch("/api/gocardless/sync", {
+      const res = await fetch("/api/banking/sync", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

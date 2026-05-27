@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { listInstitutions } from "@/lib/gocardless";
+import { listASPSPs } from "@/lib/enablebanking";
 
 /**
- * GET /api/gocardless/institutions?country=GB
- * Lists available banking institutions for a given country.
+ * GET /api/banking/institutions?country=DE
+ * Lists available banks (ASPSPs) for a given country.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -32,7 +32,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing country parameter" }, { status: 400 });
     }
 
-    const institutions = await listInstitutions(user.id, country.toUpperCase());
+    const aspsps = await listASPSPs(country);
+
+    // Map to a simpler format for the frontend
+    const institutions = aspsps.map((a) => ({
+      id: `${a.name}__${a.country}`,
+      name: a.name,
+      country: a.country,
+      logo: a.logo,
+      bic: a.bic || null,
+    }));
 
     return NextResponse.json({ institutions });
   } catch (error) {

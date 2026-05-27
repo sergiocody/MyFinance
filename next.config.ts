@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com http://127.0.0.1:11434 http://localhost:11434 https://bankaccountdata.gocardless.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com http://127.0.0.1:11434 http://localhost:11434 https://api.enablebanking.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

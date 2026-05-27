@@ -64,8 +64,10 @@ export type Database = {
           account_id: string;
           institution_id: string;
           institution_name: string | null;
-          requisition_id: string | null;
-          gocardless_account_id: string | null;
+          authorization_id: string | null;
+          session_id: string | null;
+          session_expires_at: string | null;
+          external_account_uid: string | null;
           status: "pending" | "linked" | "expired" | "error" | "suspended";
           last_synced_at: string | null;
           error_message: string | null;
@@ -78,8 +80,10 @@ export type Database = {
           account_id: string;
           institution_id: string;
           institution_name?: string | null;
-          requisition_id?: string | null;
-          gocardless_account_id?: string | null;
+          authorization_id?: string | null;
+          session_id?: string | null;
+          session_expires_at?: string | null;
+          external_account_uid?: string | null;
           status?: "pending" | "linked" | "expired" | "error" | "suspended";
           last_synced_at?: string | null;
           error_message?: string | null;
@@ -91,8 +95,10 @@ export type Database = {
           account_id?: string;
           institution_id?: string;
           institution_name?: string | null;
-          requisition_id?: string | null;
-          gocardless_account_id?: string | null;
+          authorization_id?: string | null;
+          session_id?: string | null;
+          session_expires_at?: string | null;
+          external_account_uid?: string | null;
           status?: "pending" | "linked" | "expired" | "error" | "suspended";
           last_synced_at?: string | null;
           error_message?: string | null;
@@ -347,45 +353,7 @@ export type Database = {
           }
         ];
       };
-      gocardless_tokens: {
-        Row: {
-          id: string;
-          user_id: string;
-          access_token: string;
-          access_expires_at: string;
-          refresh_token: string;
-          refresh_expires_at: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          access_token: string;
-          access_expires_at: string;
-          refresh_token: string;
-          refresh_expires_at: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          user_id?: string;
-          access_token?: string;
-          access_expires_at?: string;
-          refresh_token?: string;
-          refresh_expires_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "gocardless_tokens_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
+
     };
     Views: {
       users: {

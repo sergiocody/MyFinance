@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { syncAccountTransactions } from "@/lib/gocardless";
+import { startAuthorization } from "@/lib/enablebanking";
 import type { Database } from "@/lib/database.types";
 
 /**
- * POST /api/gocardless/sync
- * Triggers a manual sync of transactions for an automated account.
+ * POST /api/banking/connect
+ * Starts the Enable Banking authorization flow.
+ * Returns a URL to redirect the user to the bank's consent page.
  *
- * Body: { accountId }
+ * Body: { accountId, aspspName, aspspCountry }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,13 +31,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { accountId } = await request.json();
+    const { accountId, aspspName, aspspCountry } = await request.json();
 
-    if (!accountId) {
-      return NextResponse.json({ error: "Missing accountId" }, { status: 400 });
+    if (!accountId || !aspspName || !aspspCountry) {
+      return NextResponse.json(
+        { error: "Missing accountId, aspspName, or aspspCountry" },
+        { status: 400 }
+      );
     }
 
-    // Verify account belongs to user
+    // Verify the account belongs to the user and is automated
     const { data: account, error: accError } = await authClient
       .from("accounts")
       .select("id, account_mode")
@@ -54,9 +58,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await syncAccountTransactions(user.id, accountId);
+    // Build the redirect URL and a unique state parameter
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    const redirectUrl = `${appUrl}/api/banking/callback`;
+    const state = `${accountId}`;
 
-    return NextResponse.json(result);
+    // Start Enable Banking authorization
+    const { url, authorization_id } = await startAuthorization({
+      aspspName,
+      aspspCountry,
+      redirectUrl,
+      state,
+    });
+
+    // Upsert bank_connections record
+    const serviceClient = createClient<Database>(
+      supabaseUrl,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    await serviceClient.from("bank_connections").upsert(
+      {
+        user_id: user.id,
+        account_id: accountId,
+        institution_id: `${aspspName}__${aspspCountry}`,
+        institution_name: aspspName,
+        authorization_id,
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "account_id" }
+    );
+
+    return NextResponse.json({ url, authorizationId: authorization_id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
