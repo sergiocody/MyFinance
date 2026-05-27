@@ -360,6 +360,39 @@ export default function TransactionsPage() {
       return;
     }
 
+    // For synced transactions, only allow updating category, labels, and notes
+    const isSyncedEdit = editing && editing.source === "sync";
+
+    if (isSyncedEdit) {
+      const { error } = await supabase
+        .from("transactions")
+        .update({
+          category_id: form.category_id || null,
+          notes: form.notes || null,
+        })
+        .eq("id", editing.id);
+
+      if (error) {
+        setFormError(error.message);
+        return;
+      }
+
+      // Update labels
+      await supabase.from("transaction_labels").delete().eq("transaction_id", editing.id);
+      if (form.label_ids.length > 0) {
+        await supabase.from("transaction_labels").insert(
+          form.label_ids.map((lid) => ({
+            transaction_id: editing.id,
+            label_id: lid,
+          }))
+        );
+      }
+
+      setModalOpen(false);
+      loadTransactions();
+      return;
+    }
+
     const payload = {
         account_id: form.account_id,
         category_id: form.category_id || null,
@@ -544,6 +577,7 @@ export default function TransactionsPage() {
           <button
             onClick={() => openCreate("expense")}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+            hidden={Boolean(filterAccount && accounts.find((a) => a.id === filterAccount)?.account_mode === "automated")}
           >
             <Plus size={16} />
             New expense
@@ -770,24 +804,28 @@ export default function TransactionsPage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => openDuplicate(tx)}
-                      className={mobileActionButtonClass}
-                    >
-                      Copy
-                    </button>
+                    {tx.source !== "sync" && (
+                      <button
+                        onClick={() => openDuplicate(tx)}
+                        className={mobileActionButtonClass}
+                      >
+                        Copy
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(tx)}
                       className={mobileActionButtonClass}
                     >
-                      Edit
+                      {tx.source === "sync" ? "Categorize" : "Edit"}
                     </button>
-                    <button
-                      onClick={() => handleDelete(tx.id)}
-                      className="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
+                    {tx.source !== "sync" && (
+                      <button
+                        onClick={() => handleDelete(tx.id)}
+                        className="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -888,26 +926,31 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => openDuplicate(tx)}
-                        className={actionIconButtonClass}
-                        aria-label="Copy transaction"
-                        title="Copy transaction"
-                      >
-                        <Copy size={14} />
-                      </button>
+                      {tx.source !== "sync" && (
+                        <button
+                          onClick={() => openDuplicate(tx)}
+                          className={actionIconButtonClass}
+                          aria-label="Copy transaction"
+                          title="Copy transaction"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(tx)}
                         className={actionIconButtonClass}
+                        title={tx.source === "sync" ? "Categorize" : "Edit"}
                       >
                         <Pencil size={14} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(tx.id)}
-                        className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {tx.source !== "sync" && (
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

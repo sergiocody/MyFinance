@@ -7,8 +7,8 @@ import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import { format, startOfMonth, subMonths } from "date-fns";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import type { Account } from "@/lib/database.types";
+import { Plus, Pencil, Trash2, RefreshCw, Link2, Wifi, WifiOff } from "lucide-react";
+import type { Account, BankConnection } from "@/lib/database.types";
 
 const ACCOUNT_TYPES = [
   { value: "checking", label: "Checking" },
@@ -186,12 +186,180 @@ function AccountTrendSparkline({
   );
 }
 
+const COUNTRIES = [
+  { code: "GB", label: "United Kingdom" },
+  { code: "DE", label: "Germany" },
+  { code: "ES", label: "Spain" },
+  { code: "FR", label: "France" },
+  { code: "NL", label: "Netherlands" },
+  { code: "IT", label: "Italy" },
+  { code: "IE", label: "Ireland" },
+  { code: "PT", label: "Portugal" },
+  { code: "AT", label: "Austria" },
+  { code: "BE", label: "Belgium" },
+];
+
+type Institution = {
+  id: string;
+  name: string;
+  logo: string;
+  countries: string[];
+};
+
+function BankConnectFlow({
+  accountId,
+  onClose,
+}: {
+  accountId: string | null;
+  onClose: () => void;
+}) {
+  const [country, setCountry] = useState("DE");
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [search, setSearch] = useState("");
+
+  async function loadInstitutions(countryCode: string) {
+    setLoadingInstitutions(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/gocardless/institutions?country=${countryCode}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.ok) {
+        const { institutions: data } = await res.json();
+        setInstitutions(data ?? []);
+      }
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  }
+
+  useEffect(() => {
+    if (accountId) {
+      loadInstitutions(country);
+    }
+  }, [accountId, country]);
+
+  async function handleSelectInstitution(institution: Institution) {
+    if (!accountId) return;
+    setConnecting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch("/api/gocardless/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          accountId,
+          institutionId: institution.id,
+          institutionName: institution.name,
+        }),
+      });
+
+      if (res.ok) {
+        const { link } = await res.json();
+        window.location.href = link;
+      } else {
+        const { error } = await res.json();
+        alert(`Connection failed: ${error}`);
+      }
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  const filtered = institutions.filter((i) =>
+    i.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+        <select
+          value={country}
+          onChange={(e) => {
+            setCountry(e.target.value);
+            setSearch("");
+          }}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <input
+          type="text"
+          placeholder="Search banks..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+      </div>
+
+      {loadingInstitutions ? (
+        <div className="flex justify-center py-8">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="max-h-64 space-y-1 overflow-y-auto">
+          {filtered.map((inst) => (
+            <button
+              key={inst.id}
+              onClick={() => handleSelectInstitution(inst)}
+              disabled={connecting}
+              className="flex w-full items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              {inst.logo && (
+                <img
+                  src={inst.logo}
+                  alt=""
+                  className="h-6 w-6 rounded object-contain"
+                />
+              )}
+              <span className="font-medium text-gray-900">{inst.name}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && !loadingInstitutions && (
+            <p className="py-4 text-center text-sm text-gray-500">No banks found</p>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-end pt-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountsPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [bankConnections, setBankConnections] = useState<Record<string, BankConnection>>({});
   const [accountTrends, setAccountTrends] = useState<Record<string, AccountTrendPoint[]>>({});
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [connectAccountId, setConnectAccountId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<string | null>(null);
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -200,6 +368,7 @@ export default function AccountsPage() {
     initial_balance: "0",
     color: "#3b82f6",
     currency: "EUR",
+    account_mode: "manual" as "manual" | "automated",
   });
 
   async function loadAccounts() {
@@ -208,7 +377,7 @@ export default function AccountsPage() {
       .toISOString()
       .split("T")[0];
 
-    const [{ data: accountRows }, { data: transactionRows }] = await Promise.all([
+    const [{ data: accountRows }, { data: transactionRows }, { data: connectionRows }] = await Promise.all([
       supabase
         .from("accounts")
         .select("*")
@@ -217,6 +386,9 @@ export default function AccountsPage() {
         .from("transactions")
         .select("account_id, transfer_to_account_id, type, amount, date")
         .gte("date", periodStart),
+      supabase
+        .from("bank_connections")
+        .select("*"),
     ]);
 
     if (accountRows) {
@@ -225,11 +397,18 @@ export default function AccountsPage() {
       setAccountTrends(buildAccountTrends(typedAccounts, (transactionRows ?? []) as AccountHistoryRow[]));
     }
 
+    if (connectionRows) {
+      const connMap: Record<string, BankConnection> = {};
+      for (const conn of connectionRows as BankConnection[]) {
+        connMap[conn.account_id] = conn;
+      }
+      setBankConnections(connMap);
+    }
+
     setLoading(false);
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadAccounts();
   }, []);
 
@@ -242,6 +421,7 @@ export default function AccountsPage() {
       initial_balance: "0",
       color: "#3b82f6",
       currency: "EUR",
+      account_mode: "manual",
     });
     setModalOpen(true);
   }
@@ -255,6 +435,7 @@ export default function AccountsPage() {
       initial_balance: String(account.initial_balance),
       color: account.color,
       currency: account.currency,
+      account_mode: account.account_mode,
     });
     setModalOpen(true);
   }
@@ -279,10 +460,11 @@ export default function AccountsPage() {
         name: form.name,
         type: form.type,
         bank_name: form.bank_name || null,
-        initial_balance: balance,
-        current_balance: balance,
+        initial_balance: form.account_mode === "manual" ? balance : 0,
+        current_balance: form.account_mode === "manual" ? balance : 0,
         color: form.color,
         currency: form.currency,
+        account_mode: form.account_mode,
       });
     }
     setModalOpen(false);
@@ -309,6 +491,41 @@ export default function AccountsPage() {
 
   function stopCardNavigation(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
+  }
+
+  async function handleSync(accountId: string) {
+    setSyncing(accountId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch("/api/gocardless/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ accountId }),
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json();
+        alert(`Sync failed: ${error}`);
+      } else {
+        const result = await res.json();
+        alert(`Sync complete: ${result.imported} imported, ${result.skipped} skipped`);
+        loadAccounts();
+      }
+    } catch (err) {
+      alert(`Sync error: ${err instanceof Error ? err.message : "Unknown"}`);
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  async function handleConnectBank(accountId: string) {
+    setConnectAccountId(accountId);
+    setConnectModalOpen(true);
   }
 
   if (loading) {
@@ -394,6 +611,69 @@ export default function AccountsPage() {
               </p>
             </div>
 
+            {/* Bank connection status for automated accounts */}
+            {account.account_mode === "automated" && (
+              <div className="mt-3 flex items-center gap-2">
+                {bankConnections[account.id]?.status === "linked" ? (
+                  <>
+                    <Wifi size={12} className="text-green-600" />
+                    <span className="text-xs text-green-700">Connected</span>
+                    {bankConnections[account.id]?.last_synced_at && (
+                      <span className="text-xs text-gray-400">
+                        · Synced {format(new Date(bankConnections[account.id].last_synced_at!), "dd MMM HH:mm")}
+                      </span>
+                    )}
+                    <button
+                      onClick={(event) => {
+                        stopCardNavigation(event);
+                        handleSync(account.id);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      disabled={syncing === account.id}
+                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      <RefreshCw size={12} className={syncing === account.id ? "animate-spin" : ""} />
+                      Sync
+                    </button>
+                  </>
+                ) : bankConnections[account.id]?.status === "expired" || bankConnections[account.id]?.status === "error" ? (
+                  <>
+                    <WifiOff size={12} className="text-amber-600" />
+                    <span className="text-xs text-amber-700">
+                      {bankConnections[account.id]?.status === "expired" ? "Expired" : "Error"}
+                    </span>
+                    <button
+                      onClick={(event) => {
+                        stopCardNavigation(event);
+                        handleConnectBank(account.id);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                    >
+                      <Link2 size={12} />
+                      Reconnect
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff size={12} className="text-gray-400" />
+                    <span className="text-xs text-gray-500">Not connected</span>
+                    <button
+                      onClick={(event) => {
+                        stopCardNavigation(event);
+                        handleConnectBank(account.id);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                    >
+                      <Link2 size={12} />
+                      Connect Bank
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="mt-4">
               <AccountTrendSparkline
                 points={accountTrends[account.id] ?? []}
@@ -436,6 +716,38 @@ export default function AccountsPage() {
         title={editing ? "Edit Account" : "New Account"}
       >
         <form onSubmit={handleSave} className="space-y-4">
+          {!editing && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Account Mode</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, account_mode: "manual" })}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    form.account_mode === "manual"
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Manual
+                  <span className="mt-0.5 block text-xs font-normal opacity-70">Cash, Investments</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, account_mode: "automated" })}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    form.account_mode === "automated"
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Automated
+                  <span className="mt-0.5 block text-xs font-normal opacity-70">Bank connection</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
             <input
@@ -483,7 +795,7 @@ export default function AccountsPage() {
             />
           </div>
 
-          {!editing && (
+          {!editing && form.account_mode === "manual" && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Initial Balance (€)
@@ -531,6 +843,21 @@ export default function AccountsPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Connect Bank Modal */}
+      <Modal
+        open={connectModalOpen}
+        onClose={() => setConnectModalOpen(false)}
+        title="Connect Bank Account"
+      >
+        <BankConnectFlow
+          accountId={connectAccountId}
+          onClose={() => {
+            setConnectModalOpen(false);
+            loadAccounts();
+          }}
+        />
       </Modal>
     </div>
   );

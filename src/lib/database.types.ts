@@ -14,6 +14,7 @@ export type Database = {
           bank_name: string | null;
           color: string;
           is_active: boolean;
+          account_mode: "manual" | "automated";
           created_at: string;
           updated_at: string;
         };
@@ -28,6 +29,7 @@ export type Database = {
           bank_name?: string | null;
           color?: string;
           is_active?: boolean;
+          account_mode?: "manual" | "automated";
           created_at?: string;
           updated_at?: string;
         };
@@ -42,6 +44,7 @@ export type Database = {
           bank_name?: string | null;
           color?: string;
           is_active?: boolean;
+          account_mode?: "manual" | "automated";
           updated_at?: string;
         };
         Relationships: [
@@ -50,6 +53,64 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      bank_connections: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          account_id: string;
+          institution_id: string;
+          institution_name: string | null;
+          requisition_id: string | null;
+          gocardless_account_id: string | null;
+          status: "pending" | "linked" | "expired" | "error" | "suspended";
+          last_synced_at: string | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          account_id: string;
+          institution_id: string;
+          institution_name?: string | null;
+          requisition_id?: string | null;
+          gocardless_account_id?: string | null;
+          status?: "pending" | "linked" | "expired" | "error" | "suspended";
+          last_synced_at?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string | null;
+          account_id?: string;
+          institution_id?: string;
+          institution_name?: string | null;
+          requisition_id?: string | null;
+          gocardless_account_id?: string | null;
+          status?: "pending" | "linked" | "expired" | "error" | "suspended";
+          last_synced_at?: string | null;
+          error_message?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "bank_connections_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bank_connections_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: true;
+            referencedRelation: "accounts";
             referencedColumns: ["id"];
           }
         ];
@@ -134,6 +195,8 @@ export type Database = {
           transaction_hash: string | null;
           transfer_to_account_id: string | null;
           import_id: string | null;
+          source: "manual" | "sync";
+          external_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -150,6 +213,8 @@ export type Database = {
           transaction_hash?: string | null;
           transfer_to_account_id?: string | null;
           import_id?: string | null;
+          source?: "manual" | "sync";
+          external_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -165,6 +230,8 @@ export type Database = {
           transaction_hash?: string | null;
           transfer_to_account_id?: string | null;
           import_id?: string | null;
+          source?: "manual" | "sync";
+          external_id?: string | null;
         };
         Relationships: [
           {
@@ -280,6 +347,45 @@ export type Database = {
           }
         ];
       };
+      gocardless_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          access_token: string;
+          access_expires_at: string;
+          refresh_token: string;
+          refresh_expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          access_token: string;
+          access_expires_at: string;
+          refresh_token: string;
+          refresh_expires_at: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          access_token?: string;
+          access_expires_at?: string;
+          refresh_token?: string;
+          refresh_expires_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gocardless_tokens_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       users: {
@@ -293,6 +399,7 @@ export type Database = {
 };
 
 export type Account = Database["public"]["Tables"]["accounts"]["Row"];
+export type BankConnection = Database["public"]["Tables"]["bank_connections"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type Label = Database["public"]["Tables"]["labels"]["Row"];
 export type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
