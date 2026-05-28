@@ -73,16 +73,8 @@ export async function POST(request: NextRequest) {
       state,
     });
 
-    // Upsert bank_connections record
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceKey) {
-      return NextResponse.json({ error: "Server misconfigured (service key)" }, { status: 500 });
-    }
-    const serviceClient = createClient<Database>(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const { error: upsertError } = await serviceClient.from("bank_connections").upsert(
+    // Upsert bank_connections record (using authClient — RLS passes since user_id = auth.uid())
+    const { error: upsertError } = await authClient.from("bank_connections").upsert(
       {
         user_id: user.id,
         account_id: accountId,

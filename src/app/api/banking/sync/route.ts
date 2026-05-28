@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await syncAccountTransactions(user.id, accountId);
+    const result = await syncAccountTransactions(user.id, accountId, authClient);
 
     return NextResponse.json(result);
   } catch (error) {

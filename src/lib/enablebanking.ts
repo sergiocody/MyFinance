@@ -7,7 +7,7 @@
  * Base URL: https://api.enablebanking.com
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import * as crypto from "crypto";
 
@@ -301,12 +301,13 @@ export interface SyncResult {
  */
 export async function syncAccountTransactions(
   userId: string,
-  accountId: string
+  accountId: string,
+  client: SupabaseClient<Database>
 ): Promise<SyncResult> {
-  const admin = getAdminClient();
+  const db = client;
 
   // Get bank connection details
-  const { data: connection, error: connError } = await admin
+  const { data: connection, error: connError } = await db
     .from("bank_connections")
     .select("*")
     .eq("account_id", accountId)
@@ -327,7 +328,7 @@ export async function syncAccountTransactions(
 
   // Check if session is still valid
   if (connection.session_expires_at && new Date(connection.session_expires_at) < new Date()) {
-    await admin
+    await db
       .from("bank_connections")
       .update({ status: "expired", updated_at: new Date().toISOString() })
       .eq("id", connection.id);
@@ -358,7 +359,7 @@ export async function syncAccountTransactions(
     const description = extractDescription(tx);
     const date = tx.booking_date || tx.value_date || tx.transaction_date || new Date().toISOString().split("T")[0];
 
-    const { error } = await admin.from("transactions").upsert(
+    const { error } = await db.from("transactions").upsert(
       {
         account_id: accountId,
         user_id: userId,
@@ -384,7 +385,7 @@ export async function syncAccountTransactions(
   }
 
   // Update last synced timestamp
-  await admin
+  await db
     .from("bank_connections")
     .update({
       last_synced_at: new Date().toISOString(),

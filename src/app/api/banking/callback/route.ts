@@ -29,17 +29,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceClient = createClient<Database>(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const dbClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
-    // Get the bank connection for this account
-    const { data: connection, error: connError } = await serviceClient
-      .from("bank_connections")
-      .select("*")
-      .eq("account_id", accountId)
-      .single();
+    // Get the bank connection for this account (via SECURITY DEFINER function)
+    const { data: connections, error: connError } = await dbClient
+      .rpc("get_bank_connection_by_account", { p_account_id: accountId });
+
+    const connection = connections?.[0];
 
     if (connError || !connection) {
       console.error("[callback] connection_not_found for accountId:", accountId, "error:", connError);
@@ -50,14 +47,10 @@ export async function GET(request: NextRequest) {
     const session = await createSession(code);
 
     if (!session.accounts || session.accounts.length === 0) {
-      await serviceClient
-        .from("bank_connections")
-        .update({
-          status: "error",
-          error_message: "No accounts returned from bank authorization",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", connection.id);
+      await dbClient.rpc("set_bank_connection_error", {
+        p_connection_id: connection.id,
+        p_error_message: "No accounts returned from bank authorization",
+      });
 
       return NextResponse.redirect(`${appUrl}/accounts?error=no_bank_accounts`);
     }
@@ -69,17 +62,14 @@ export async function GET(request: NextRequest) {
     // Calculate session expiry (default 90 days from now if not available from session data)
     const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
-    await serviceClient
-      .from("bank_connections")
-      .update({
-        external_account_uid: accountUid,
-        session_id: session.session_id,
-        session_expires_at: sessionExpiresAt,
-        status: "linked",
-        error_message: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", connection.id);
+    await dbClient.rpc("update_bank_connection_session", {
+      p_connection_id: connection.id,
+      p_external_account_uid: accountUid,
+      p_session_id: session.session_id,
+      p_session_expires_at: sessionExpiresAt,
+      p_status: "linked",
+      p_error_message: null,
+    });
 
     return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
   } catch (err) {
