@@ -74,12 +74,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Upsert bank_connections record
-    const serviceClient = createClient<Database>(
-      supabaseUrl,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey) {
+      return NextResponse.json({ error: "Server misconfigured (service key)" }, { status: 500 });
+    }
+    const serviceClient = createClient<Database>(supabaseUrl, serviceKey);
 
-    await serviceClient.from("bank_connections").upsert(
+    const { error: upsertError } = await serviceClient.from("bank_connections").upsert(
       {
         user_id: user.id,
         account_id: accountId,
@@ -91,6 +92,11 @@ export async function POST(request: NextRequest) {
       },
       { onConflict: "account_id" }
     );
+
+    if (upsertError) {
+      console.error("[connect] upsert bank_connections failed:", upsertError);
+      return NextResponse.json({ error: "Failed to save bank connection" }, { status: 500 });
+    }
 
     return NextResponse.json({ url, authorizationId: authorization_id });
   } catch (error) {

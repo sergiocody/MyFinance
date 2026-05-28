@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (connError || !connection) {
+      console.error("[callback] connection_not_found for accountId:", accountId, "error:", connError);
       return NextResponse.redirect(`${appUrl}/accounts?error=connection_not_found`);
     }
 

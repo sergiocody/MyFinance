@@ -214,7 +214,7 @@ function BankConnectFlow({
   accountId: string | null;
   onClose: () => void;
 }) {
-  const [country, setCountry] = useState("DE");
+  const [country, setCountry] = useState("ES");
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loadingInstitutions, setLoadingInstitutions] = useState(false);
   const [connecting, setConnecting] = useState(false);
