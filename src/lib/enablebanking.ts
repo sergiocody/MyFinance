@@ -390,6 +390,25 @@ export async function syncAccountTransactions(
     }
   }
 
+  // Fetch real balance from the bank and update account
+  try {
+    const { balances } = await getAccountBalances(connection.external_account_uid);
+    // Prefer "closingBooked" or "expected", fallback to first available
+    const preferred = balances.find(b => b.balance_type === "closingBooked")
+      || balances.find(b => b.balance_type === "expected")
+      || balances[0];
+    if (preferred) {
+      const bankBalance = parseFloat(preferred.balance_amount.amount);
+      await db
+        .from("accounts")
+        .update({ current_balance: bankBalance, updated_at: new Date().toISOString() })
+        .eq("id", accountId);
+      console.log(`[sync] updated account balance from bank: ${bankBalance} ${preferred.balance_amount.currency} (type: ${preferred.balance_type})`);
+    }
+  } catch (balanceErr) {
+    console.warn(`[sync] failed to fetch balance from bank:`, balanceErr);
+  }
+
   // Update last synced timestamp
   await db
     .from("bank_connections")
