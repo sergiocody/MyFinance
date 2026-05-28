@@ -640,8 +640,12 @@ export default function AccountsPage() {
                 openTransactionsForAccount(account.id);
               }
             }}
-            className={`cursor-pointer transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+            className={`cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
               !account.is_active ? "opacity-50" : ""
+            } ${
+              account.account_mode === "automated"
+                ? "border-l-4 border-l-indigo-500 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-indigo-50/30 hover:border-l-indigo-600"
+                : "hover:border-gray-300"
             }`}
           >
             <div className="flex items-start justify-between">
