@@ -343,7 +343,7 @@ export async function syncAccountTransactions(
   const isFirstSync = !connection.last_synced_at;
   const dateFrom = isFirstSync
     ? undefined
-    : new Date(new Date(connection.last_synced_at).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    : new Date(new Date(connection.last_synced_at!).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const transactions = await getAccountTransactions(
     connection.external_account_uid,
