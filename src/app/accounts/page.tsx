@@ -362,6 +362,8 @@ export default function AccountsPage() {
   const [connectAccountId, setConnectAccountId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ account: Account; txCount: number } | null>(null);
+  const [migrateTarget, setMigrateTarget] = useState<string>("");
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -474,8 +476,46 @@ export default function AccountsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this account and all its transactions?")) return;
-    await supabase.from("accounts").delete().eq("id", id);
+    const account = accounts.find(a => a.id === id);
+    if (!account) return;
+
+    // Check if account has transactions (as source or transfer destination)
+    const { count } = await supabase
+      .from("transactions")
+      .select("*", { count: "exact", head: true })
+      .or(`account_id.eq.${id},transfer_to_account_id.eq.${id}`);
+
+    if (count && count > 0) {
+      setDeleteModal({ account, txCount: count });
+      setMigrateTarget("");
+    } else {
+      if (!confirm("Delete this empty account?")) return;
+      await supabase.from("accounts").delete().eq("id", id);
+      loadAccounts();
+    }
+  }
+
+  async function confirmDeleteWithMigration() {
+    if (!deleteModal || !migrateTarget) return;
+    const sourceId = deleteModal.account.id;
+
+    // Migrate transactions where this account is the source
+    await supabase
+      .from("transactions")
+      .update({ account_id: migrateTarget })
+      .eq("account_id", sourceId);
+
+    // Migrate transactions where this account is the transfer destination
+    await supabase
+      .from("transactions")
+      .update({ transfer_to_account_id: migrateTarget })
+      .eq("transfer_to_account_id", sourceId);
+
+    // Now delete the account (no more references)
+    await supabase.from("accounts").delete().eq("id", sourceId);
+
+    setDeleteModal(null);
+    showToast("success", `Account deleted. ${deleteModal.txCount} transactions moved.`);
     loadAccounts();
   }
 
@@ -862,6 +902,54 @@ export default function AccountsPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Account Modal */}
+      <Modal
+        open={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        title="Delete Account"
+      >
+        {deleteModal && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              <strong>{deleteModal.account.name}</strong> has{" "}
+              <strong>{deleteModal.txCount}</strong> linked transactions.
+              Select another account to move them to:
+            </p>
+            <select
+              value={migrateTarget}
+              onChange={(e) => setMigrateTarget(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">Select account...</option>
+              {accounts
+                .filter((a) => a.id !== deleteModal.account.id)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.currency})
+                  </option>
+                ))}
+            </select>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModal(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!migrateTarget}
+                onClick={confirmDeleteWithMigration}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                Move &amp; Delete
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Connect Bank Modal */}
