@@ -495,7 +495,17 @@ export default function AccountsPage() {
       setMigrateTarget("");
     } else {
       if (!confirm("Delete this empty account?")) return;
-      await supabase.from("accounts").delete().eq("id", id);
+      // Delete related bank connections first
+      await supabase.from("bank_connections").delete().eq("account_id", id);
+      // Clear imports reference
+      await supabase.from("imports").update({ account_id: null }).eq("account_id", id);
+      // Delete the account
+      const { error } = await supabase.from("accounts").delete().eq("id", id);
+      if (error) {
+        showToast("error", `Failed to delete: ${error.message}`);
+      } else {
+        showToast("success", "Account deleted");
+      }
       loadAccounts();
     }
   }
@@ -516,8 +526,12 @@ export default function AccountsPage() {
       .update({ transfer_to_account_id: migrateTarget })
       .eq("transfer_to_account_id", sourceId);
 
+    // Delete related bank connections first
+    await supabase.from("bank_connections").delete().eq("account_id", sourceId);
+    // Clear imports reference
+    await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
     // Now delete the account (no more references)
-    await supabase.from("accounts").delete().eq("id", sourceId);
+    const { error } = await supabase.from("accounts").delete().eq("id", sourceId);
 
     setDeleteModal(null);
     showToast("success", `Account deleted. ${deleteModal.txCount} transactions moved.`);
