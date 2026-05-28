@@ -338,17 +338,36 @@ export async function syncAccountTransactions(
     throw new Error("Bank session has expired. Please reconnect your bank account.");
   }
 
-  // First sync: fetch max history (2 years back)
+  // First sync: try 2 years, fallback to 89 days if bank rejects
   // Subsequent syncs: fetch from last sync date minus 1 day overlap
   const isFirstSync = !connection.last_synced_at;
-  const dateFrom = isFirstSync
-    ? new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-    : new Date(new Date(connection.last_synced_at!).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  let dateFrom: string;
 
-  const transactions = await getAccountTransactions(
-    connection.external_account_uid,
-    dateFrom
-  );
+  if (!isFirstSync) {
+    dateFrom = new Date(new Date(connection.last_synced_at!).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  } else {
+    dateFrom = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  }
+
+  let transactions: EnableBankingTransaction[];
+  try {
+    transactions = await getAccountTransactions(
+      connection.external_account_uid,
+      dateFrom
+    );
+  } catch (err) {
+    if (isFirstSync) {
+      // Bank rejected long range, retry with 89 days
+      console.log(`[sync] 2-year range failed, retrying with 89 days`);
+      dateFrom = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      transactions = await getAccountTransactions(
+        connection.external_account_uid,
+        dateFrom
+      );
+    } else {
+      throw err;
+    }
+  }
 
   console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions, dateFrom=${dateFrom}`);
 
