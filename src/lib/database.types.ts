@@ -1,6 +1,44 @@
 export type Database = {
   public: {
-    Functions: Record<string, never>;
+    Functions: {
+      get_bank_connection_by_account: {
+        Args: { p_account_id: string };
+        Returns: {
+          id: string;
+          user_id: string;
+          account_id: string;
+          institution_id: string;
+          institution_name: string | null;
+          authorization_id: string | null;
+          session_id: string | null;
+          session_expires_at: string | null;
+          external_account_uid: string | null;
+          status: string;
+          last_synced_at: string | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
+      update_bank_connection_session: {
+        Args: {
+          p_connection_id: string;
+          p_external_account_uid: string;
+          p_session_id: string;
+          p_session_expires_at: string;
+          p_status: string;
+          p_error_message?: string | null;
+        };
+        Returns: undefined;
+      };
+      set_bank_connection_error: {
+        Args: {
+          p_connection_id: string;
+          p_error_message: string;
+        };
+        Returns: undefined;
+      };
+    };
     Tables: {
       accounts: {
         Row: {
