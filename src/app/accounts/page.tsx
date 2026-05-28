@@ -691,19 +691,31 @@ export default function AccountsPage() {
             </div>
 
             <div className="mt-4">
-              <p className="text-xs text-gray-500">Current Balance</p>
-              <p className={`text-xl font-bold ${Number(account.current_balance) >= 0 ? "text-gray-900" : "text-red-600"}`}>
-                {formatCurrency(Number(account.current_balance), account.currency)}
-              </p>
-              {accounts.some(a => a.parent_account_id === account.id) && (
-                <p className="text-xs text-gray-400">
-                  Effective: {formatCurrency(
-                    Number(account.current_balance) - accounts
-                      .filter(a => a.parent_account_id === account.id)
-                      .reduce((sum, a) => sum + Number(a.current_balance), 0),
-                    account.currency
-                  )}
-                </p>
+              {accounts.some(a => a.parent_account_id === account.id) ? (
+                <>
+                  <p className="text-xs text-gray-500">Effective Balance</p>
+                  <p className={`text-xl font-bold ${
+                    Number(account.current_balance) - accounts.filter(a => a.parent_account_id === account.id).reduce((sum, a) => sum + Number(a.current_balance), 0) >= 0
+                      ? "text-gray-900" : "text-red-600"
+                  }`}>
+                    {formatCurrency(
+                      Number(account.current_balance) - accounts
+                        .filter(a => a.parent_account_id === account.id)
+                        .reduce((sum, a) => sum + Number(a.current_balance), 0),
+                      account.currency
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Bank total: {formatCurrency(Number(account.current_balance), account.currency)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500">Current Balance</p>
+                  <p className={`text-xl font-bold ${Number(account.current_balance) >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                    {formatCurrency(Number(account.current_balance), account.currency)}
+                  </p>
+                </>
               )}
             </div>
 
