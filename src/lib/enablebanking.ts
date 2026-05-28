@@ -236,7 +236,8 @@ export async function getSession(sessionId: string): Promise<{
 export async function getAccountTransactions(
   accountUid: string,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  strategy?: "default" | "longest"
 ): Promise<EnableBankingTransaction[]> {
   const allTransactions: EnableBankingTransaction[] = [];
   let continuationKey: string | undefined;
@@ -245,6 +246,7 @@ export async function getAccountTransactions(
     const params: Record<string, string> = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (strategy) params.strategy = strategy;
     if (continuationKey) params.continuation_key = continuationKey;
 
     const data = await apiGet<{
@@ -336,22 +338,21 @@ export async function syncAccountTransactions(
     throw new Error("Bank session has expired. Please reconnect your bank account.");
   }
 
-  // Determine date range: from last sync or last 90 days
-  const dateFrom = connection.last_synced_at
-    ? new Date(connection.last_synced_at).toISOString().split("T")[0]
-    : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  // First sync: use "longest" strategy to get maximum history from the bank
+  // Subsequent syncs: fetch from last sync date minus 1 day overlap
+  const isFirstSync = !connection.last_synced_at;
+  const dateFrom = isFirstSync
+    ? undefined
+    : new Date(new Date(connection.last_synced_at).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const transactions = await getAccountTransactions(
     connection.external_account_uid,
-    dateFrom
+    dateFrom,
+    undefined,
+    isFirstSync ? "longest" : undefined
   );
 
-  console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions from API, dateFrom=${dateFrom}`);
-  if (transactions.length > 0) {
-    const statuses = [...new Set(transactions.map(t => t.status))];
-    console.log(`[sync] transaction statuses found:`, statuses);
-    console.log(`[sync] sample transaction:`, JSON.stringify(transactions[0]).slice(0, 500));
-  }
+  console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions, dateFrom=${dateFrom ?? "none"}, strategy=${isFirstSync ? "longest" : "default"}`);
 
   let imported = 0;
   let skipped = 0;
