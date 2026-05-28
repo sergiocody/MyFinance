@@ -356,7 +356,6 @@ export async function syncAccountTransactions(
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
-  let firstUpsertLogged = false;
 
   for (const tx of transactions) {
     // Only process booked transactions
@@ -368,24 +367,16 @@ export async function syncAccountTransactions(
     const description = extractDescription(tx);
     const date = tx.booking_date || tx.value_date || tx.transaction_date || new Date().toISOString().split("T")[0];
 
-    const { data: upsertData, error, status, statusText } = await db.from("transactions").upsert(
-      {
-        account_id: accountId,
-        user_id: userId,
-        type,
-        amount,
-        description,
-        date,
-        source: "sync",
-        external_id: externalId,
-      },
-      { onConflict: "account_id,external_id", ignoreDuplicates: true }
-    ).select();
-
-    if (!firstUpsertLogged) {
-      console.log(`[sync] first upsert result: status=${status} statusText=${statusText} data=${JSON.stringify(upsertData)} error=${JSON.stringify(error)}`);
-      firstUpsertLogged = true;
-    }
+    const { error } = await db.from("transactions").insert({
+      account_id: accountId,
+      user_id: userId,
+      type,
+      amount,
+      description,
+      date,
+      source: "sync",
+      external_id: externalId,
+    });
 
     if (error) {
       if (error.code === "23505") {
