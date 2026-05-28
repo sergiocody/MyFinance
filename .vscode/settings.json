@@ -1,5 +1,7 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "/tmp/xlenv/bin/python3": true
+        "/tmp/xlenv/bin/python3": true,
+        "pbpaste": true,
+        "pbcopy": true
     }
 }
