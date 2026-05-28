@@ -6,8 +6,9 @@ import type { Database } from "@/lib/database.types";
 /**
  * GET /api/banking/callback?code=...&state=...
  * Enable Banking redirects here after the user authorizes the bank connection.
- * Exchanges the code for a session and stores the linked account UID.
- * Then redirects the user back to the accounts page.
+ * Exchanges the code for a session, then:
+ * - If only 1 account: auto-links it to the existing MyFinance account
+ * - If multiple accounts: redirects to a selection page
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -55,23 +56,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/accounts?error=no_bank_accounts`);
     }
 
-    // Use the first account's UID
-    const linkedAccount = session.accounts[0];
-    const accountUid = linkedAccount.uid;
-
-    // Calculate session expiry (default 90 days from now if not available from session data)
+    // Calculate session expiry (default 90 days from now)
     const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
+    if (session.accounts.length === 1) {
+      // Single account: auto-link directly
+      const linkedAccount = session.accounts[0];
+      await dbClient.rpc("update_bank_connection_session", {
+        p_connection_id: connection.id,
+        p_external_account_uid: linkedAccount.uid,
+        p_session_id: session.session_id,
+        p_session_expires_at: sessionExpiresAt,
+        p_status: "linked",
+        p_error_message: null,
+      });
+
+      return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
+    }
+
+    // Multiple accounts: store session info and redirect to selection page
+    // We store session_id on the connection but leave it in "pending" so the user picks accounts
     await dbClient.rpc("update_bank_connection_session", {
       p_connection_id: connection.id,
-      p_external_account_uid: accountUid,
+      p_external_account_uid: "", // will be set after selection
       p_session_id: session.session_id,
       p_session_expires_at: sessionExpiresAt,
-      p_status: "linked",
+      p_status: "pending",
       p_error_message: null,
     });
 
-    return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
+    // Encode accounts info in URL for the selection page
+    const bankAccounts = session.accounts.map(a => ({
+      uid: a.uid,
+      iban: a.account_id?.iban || "",
+      name: a.name || "",
+      currency: a.currency || "EUR",
+    }));
+
+    const encoded = encodeURIComponent(JSON.stringify(bankAccounts));
+    return NextResponse.redirect(
+      `${appUrl}/accounts/select-bank-accounts?accountId=${accountId}&connectionId=${connection.id}&sessionId=${session.session_id}&institution=${encodeURIComponent(connection.institution_name || connection.institution_id)}&accounts=${encoded}`
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Banking callback error:", message);
