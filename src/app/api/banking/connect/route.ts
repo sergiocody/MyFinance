@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
     if (!serviceKey) {
       return NextResponse.json({ error: "Server misconfigured (service key)" }, { status: 500 });
     }
-    const serviceClient = createClient<Database>(supabaseUrl, serviceKey);
+    const serviceClient = createClient<Database>(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     const { error: upsertError } = await serviceClient.from("bank_connections").upsert(
       {

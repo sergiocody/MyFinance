@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const serviceClient = createClient<Database>(supabaseUrl, serviceKey);
+    const serviceClient = createClient<Database>(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     // Get the bank connection for this account
     const { data: connection, error: connError } = await serviceClient
