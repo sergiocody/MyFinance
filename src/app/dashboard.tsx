@@ -108,8 +108,30 @@ export default function Dashboard() {
       const typedAccounts = accts as Account[];
       setAccounts(typedAccounts);
       setTotalBalance(typedAccounts.reduce((sum, a) => sum + Number(a.current_balance), 0));
-      setRemuneratedBalance(typedAccounts.filter(a => a.is_remunerated).reduce((sum, a) => sum + Number(a.current_balance), 0));
-      setNonRemuneratedBalance(typedAccounts.filter(a => !a.is_remunerated).reduce((sum, a) => sum + Number(a.current_balance), 0));
+
+      // Compute effective balances: parent accounts subtract children's balances
+      const childBalanceByParent = new Map<string, number>();
+      for (const a of typedAccounts) {
+        if (a.parent_account_id) {
+          childBalanceByParent.set(
+            a.parent_account_id,
+            (childBalanceByParent.get(a.parent_account_id) ?? 0) + Number(a.current_balance)
+          );
+        }
+      }
+
+      let remBal = 0;
+      let nonRemBal = 0;
+      for (const a of typedAccounts) {
+        const effectiveBalance = Number(a.current_balance) - (childBalanceByParent.get(a.id) ?? 0);
+        if (a.is_remunerated) {
+          remBal += Number(a.current_balance);
+        } else {
+          nonRemBal += effectiveBalance;
+        }
+      }
+      setRemuneratedBalance(remBal);
+      setNonRemuneratedBalance(nonRemBal);
     }
 
     const now = new Date();

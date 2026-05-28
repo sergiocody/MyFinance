@@ -54,6 +54,7 @@ export type Database = {
           is_active: boolean;
           is_remunerated: boolean;
           account_mode: "manual" | "automated";
+          parent_account_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -70,6 +71,7 @@ export type Database = {
           is_active?: boolean;
           is_remunerated?: boolean;
           account_mode?: "manual" | "automated";
+          parent_account_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -86,6 +88,7 @@ export type Database = {
           is_active?: boolean;
           is_remunerated?: boolean;
           account_mode?: "manual" | "automated";
+          parent_account_id?: string | null;
           updated_at?: string;
         };
         Relationships: [

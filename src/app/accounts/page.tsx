@@ -374,6 +374,7 @@ export default function AccountsPage() {
     currency: "EUR",
     account_mode: "manual" as "manual" | "automated",
     is_remunerated: false,
+    parent_account_id: "" as string,
   });
 
   async function loadAccounts() {
@@ -428,6 +429,7 @@ export default function AccountsPage() {
       currency: "EUR",
       account_mode: "manual",
       is_remunerated: false,
+      parent_account_id: "",
     });
     setModalOpen(true);
   }
@@ -443,6 +445,7 @@ export default function AccountsPage() {
       currency: account.currency,
       account_mode: account.account_mode,
       is_remunerated: account.is_remunerated,
+      parent_account_id: account.parent_account_id ?? "",
     });
     setModalOpen(true);
   }
@@ -461,6 +464,7 @@ export default function AccountsPage() {
           color: form.color,
           currency: form.currency,
           is_remunerated: form.is_remunerated,
+          parent_account_id: form.parent_account_id || null,
         })
         .eq("id", editing.id);
     } else {
@@ -474,6 +478,7 @@ export default function AccountsPage() {
         currency: form.currency,
         account_mode: form.account_mode,
         is_remunerated: form.is_remunerated,
+        parent_account_id: form.parent_account_id || null,
       });
     }
     setModalOpen(false);
@@ -690,6 +695,16 @@ export default function AccountsPage() {
               <p className={`text-xl font-bold ${Number(account.current_balance) >= 0 ? "text-gray-900" : "text-red-600"}`}>
                 {formatCurrency(Number(account.current_balance), account.currency)}
               </p>
+              {accounts.some(a => a.parent_account_id === account.id) && (
+                <p className="text-xs text-gray-400">
+                  Effective: {formatCurrency(
+                    Number(account.current_balance) - accounts
+                      .filter(a => a.parent_account_id === account.id)
+                      .reduce((sum, a) => sum + Number(a.current_balance), 0),
+                    account.currency
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Bank connection status for automated accounts */}
@@ -919,6 +934,27 @@ export default function AccountsPage() {
               <div className="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
             </label>
             <span className="text-sm font-medium text-gray-700">Remunerated account</span>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Sub-account of</label>
+            <select
+              value={form.parent_account_id}
+              onChange={(e) => setForm({ ...form, parent_account_id: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">None (independent account)</option>
+              {accounts
+                .filter((a) => a.id !== editing?.id && !a.parent_account_id)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400">
+              If set, this account&apos;s balance will be subtracted from the parent&apos;s displayed balance.
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
