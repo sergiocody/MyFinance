@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+
+    const authHeader = request.headers.get("authorization") || "";
+    const accessToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
 
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
@@ -24,6 +26,7 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
 
     if (authError || !user) {
+      console.error("[institutions] auth failed:", authError?.message, "token length:", accessToken.length, "token starts:", accessToken.slice(0, 30));
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -46,6 +49,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ institutions });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[institutions] error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

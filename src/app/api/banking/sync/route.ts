@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const authClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    const authClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
     const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
 
     if (authError || !user) {
