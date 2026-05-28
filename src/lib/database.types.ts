@@ -52,6 +52,7 @@ export type Database = {
           bank_name: string | null;
           color: string;
           is_active: boolean;
+          is_remunerated: boolean;
           account_mode: "manual" | "automated";
           created_at: string;
           updated_at: string;
@@ -67,6 +68,7 @@ export type Database = {
           bank_name?: string | null;
           color?: string;
           is_active?: boolean;
+          is_remunerated?: boolean;
           account_mode?: "manual" | "automated";
           created_at?: string;
           updated_at?: string;
@@ -82,6 +84,7 @@ export type Database = {
           bank_name?: string | null;
           color?: string;
           is_active?: boolean;
+          is_remunerated?: boolean;
           account_mode?: "manual" | "automated";
           updated_at?: string;
         };

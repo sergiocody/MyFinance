@@ -13,6 +13,8 @@ import {
   ArrowRightLeft,
   ArrowUpRight,
   Plus,
+  Landmark,
+  PiggyBank,
 } from "lucide-react";
 import {
   BarChart,
@@ -85,6 +87,8 @@ const QUICK_TRANSACTION_LINKS = [
 export default function Dashboard() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [remuneratedBalance, setRemuneratedBalance] = useState(0);
+  const [nonRemuneratedBalance, setNonRemuneratedBalance] = useState(0);
   const [monthIncome, setMonthIncome] = useState(0);
   const [monthExpense, setMonthExpense] = useState(0);
   const [monthlyData, setMonthlyData] = useState<MonthlySummary[]>([]);
@@ -104,6 +108,8 @@ export default function Dashboard() {
       const typedAccounts = accts as Account[];
       setAccounts(typedAccounts);
       setTotalBalance(typedAccounts.reduce((sum, a) => sum + Number(a.current_balance), 0));
+      setRemuneratedBalance(typedAccounts.filter(a => a.is_remunerated).reduce((sum, a) => sum + Number(a.current_balance), 0));
+      setNonRemuneratedBalance(typedAccounts.filter(a => !a.is_remunerated).reduce((sum, a) => sum + Number(a.current_balance), 0));
     }
 
     const now = new Date();
@@ -269,6 +275,29 @@ export default function Dashboard() {
             {formatCurrency(monthIncome - monthExpense)}
           </p>
           <p className="mt-1 text-xs text-(--color-secondary)">Income - Expenses</p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Remunerated</CardTitle>
+            <PiggyBank className="h-5 w-5 text-indigo-500" />
+          </CardHeader>
+          <p className="text-2xl font-semibold text-(--color-primary)">{formatCurrency(remuneratedBalance)}</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">
+            {accounts.filter(a => a.is_remunerated).length} account{accounts.filter(a => a.is_remunerated).length !== 1 ? "s" : ""}
+          </p>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Non-remunerated</CardTitle>
+            <Landmark className="h-5 w-5 text-gray-400" />
+          </CardHeader>
+          <p className="text-2xl font-semibold text-(--color-primary)">{formatCurrency(nonRemuneratedBalance)}</p>
+          <p className="mt-1 text-xs text-(--color-secondary)">
+            {accounts.filter(a => !a.is_remunerated).length} account{accounts.filter(a => !a.is_remunerated).length !== 1 ? "s" : ""}
+          </p>
         </Card>
       </div>
 

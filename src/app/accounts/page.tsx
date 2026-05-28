@@ -373,6 +373,7 @@ export default function AccountsPage() {
     color: "#3b82f6",
     currency: "EUR",
     account_mode: "manual" as "manual" | "automated",
+    is_remunerated: false,
   });
 
   async function loadAccounts() {
@@ -426,6 +427,7 @@ export default function AccountsPage() {
       color: "#3b82f6",
       currency: "EUR",
       account_mode: "manual",
+      is_remunerated: false,
     });
     setModalOpen(true);
   }
@@ -440,6 +442,7 @@ export default function AccountsPage() {
       color: account.color,
       currency: account.currency,
       account_mode: account.account_mode,
+      is_remunerated: account.is_remunerated,
     });
     setModalOpen(true);
   }
@@ -457,6 +460,7 @@ export default function AccountsPage() {
           bank_name: form.bank_name || null,
           color: form.color,
           currency: form.currency,
+          is_remunerated: form.is_remunerated,
         })
         .eq("id", editing.id);
     } else {
@@ -469,6 +473,7 @@ export default function AccountsPage() {
         color: form.color,
         currency: form.currency,
         account_mode: form.account_mode,
+        is_remunerated: form.is_remunerated,
       });
     }
     setModalOpen(false);
@@ -884,6 +889,19 @@ export default function AccountsPage() {
                 />
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={form.is_remunerated}
+                onChange={(e) => setForm({ ...form, is_remunerated: e.target.checked })}
+                className="peer sr-only"
+              />
+              <div className="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
+            </label>
+            <span className="text-sm font-medium text-gray-700">Remunerated account</span>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
