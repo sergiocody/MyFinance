@@ -94,8 +94,11 @@ export async function POST(request: NextRequest) {
     );
 
     if (upsertError) {
-      console.error("[connect] upsert bank_connections failed:", upsertError);
-      return NextResponse.json({ error: "Failed to save bank connection" }, { status: 500 });
+      console.error("[connect] upsert bank_connections failed:", JSON.stringify(upsertError));
+      return NextResponse.json(
+        { error: `Failed to save bank connection: ${upsertError.message} (${upsertError.code})` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ url, authorizationId: authorization_id });
