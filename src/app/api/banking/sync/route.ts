@@ -58,7 +58,18 @@ export async function POST(request: NextRequest) {
 
     const result = await syncAccountTransactions(user.id, accountId, authClient);
 
-    return NextResponse.json(result);
+    // Fetch updated balance to return to client
+    const { data: updatedAccount } = await authClient
+      .from("accounts")
+      .select("current_balance, currency")
+      .eq("id", accountId)
+      .single();
+
+    return NextResponse.json({
+      ...result,
+      balance: updatedAccount?.current_balance ?? null,
+      currency: updatedAccount?.currency ?? "EUR",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import { format, startOfMonth, subMonths } from "date-fns";
-import { Plus, Pencil, Trash2, RefreshCw, Link2, Wifi, WifiOff } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw, Link2, Wifi, WifiOff, CheckCircle2, XCircle } from "lucide-react";
 import type { Account, BankConnection } from "@/lib/database.types";
 
 const ACCOUNT_TYPES = [
@@ -361,6 +361,7 @@ export default function AccountsPage() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [connectAccountId, setConnectAccountId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -494,6 +495,11 @@ export default function AccountsPage() {
     event.stopPropagation();
   }
 
+  function showToast(type: "success" | "error", message: string) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 6000);
+  }
+
   async function handleSync(accountId: string) {
     setSyncing(accountId);
     try {
@@ -511,14 +517,15 @@ export default function AccountsPage() {
 
       if (!res.ok) {
         const { error } = await res.json();
-        alert(`Sync failed: ${error}`);
+        showToast("error", `Sync failed: ${error}`);
       } else {
         const result = await res.json();
-        alert(`Sync complete: ${result.imported} imported, ${result.skipped} skipped`);
+        const balanceText = result.balance != null ? ` · Balance: ${formatCurrency(result.balance, result.currency)}` : "";
+        showToast("success", `${result.imported} imported, ${result.skipped} skipped${balanceText}`);
         loadAccounts();
       }
     } catch (err) {
-      alert(`Sync error: ${err instanceof Error ? err.message : "Unknown"}`);
+      showToast("error", `Sync error: ${err instanceof Error ? err.message : "Unknown"}`);
     } finally {
       setSyncing(null);
     }
@@ -539,6 +546,17 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6 pt-12 lg:pt-0">
+      {toast && (
+        <div
+          className={`fixed top-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg px-4 py-3 shadow-lg transition-all ${
+            toast.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
+          }`}
+        >
+          {toast.type === "success" ? <CheckCircle2 size={18} className="text-green-600" /> : <XCircle size={18} className="text-red-600" />}
+          <span className="text-sm font-medium">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
         <button
