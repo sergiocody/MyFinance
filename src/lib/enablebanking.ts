@@ -294,6 +294,7 @@ export interface SyncResult {
   imported: number;
   skipped: number;
   errors: string[];
+  totalFetched: number;
 }
 
 /**
@@ -345,6 +346,13 @@ export async function syncAccountTransactions(
     dateFrom
   );
 
+  console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions from API, dateFrom=${dateFrom}`);
+  if (transactions.length > 0) {
+    const statuses = [...new Set(transactions.map(t => t.status))];
+    console.log(`[sync] transaction statuses found:`, statuses);
+    console.log(`[sync] sample transaction:`, JSON.stringify(transactions[0]).slice(0, 500));
+  }
+
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -395,5 +403,5 @@ export async function syncAccountTransactions(
     })
     .eq("id", connection.id);
 
-  return { imported, skipped, errors };
+  return { imported, skipped, errors, totalFetched: transactions.length };
 }
