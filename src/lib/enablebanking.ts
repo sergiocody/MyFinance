@@ -28,13 +28,18 @@ function getAdminClient() {
  */
 function generateJWT(): string {
   const appId = process.env.ENABLE_BANKING_APP_ID;
-  const privateKeyRaw = process.env.ENABLE_BANKING_PRIVATE_KEY;
+
+  // Support both plain (with escaped \n) and Base64-encoded private key
+  const privateKeyB64 = process.env.ENABLE_BANKING_PRIVATE_KEY_B64;
+  const privateKeyRaw = privateKeyB64
+    ? Buffer.from(privateKeyB64, "base64").toString("utf-8")
+    : process.env.ENABLE_BANKING_PRIVATE_KEY;
 
   if (!appId || !privateKeyRaw) {
     throw new Error("Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_PRIVATE_KEY)");
   }
 
-  // Handle escaped newlines from env vars
+  // Handle escaped newlines from env vars (plain key variant)
   const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
 
   const now = Math.floor(Date.now() / 1000);
