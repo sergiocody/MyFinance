@@ -338,21 +338,19 @@ export async function syncAccountTransactions(
     throw new Error("Bank session has expired. Please reconnect your bank account.");
   }
 
-  // First sync: use "longest" strategy to get maximum history from the bank
+  // First sync: fetch max history (2 years back)
   // Subsequent syncs: fetch from last sync date minus 1 day overlap
   const isFirstSync = !connection.last_synced_at;
   const dateFrom = isFirstSync
-    ? undefined
+    ? new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
     : new Date(new Date(connection.last_synced_at!).getTime() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const transactions = await getAccountTransactions(
     connection.external_account_uid,
-    dateFrom,
-    undefined,
-    isFirstSync ? "longest" : undefined
+    dateFrom
   );
 
-  console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions, dateFrom=${dateFrom ?? "none"}, strategy=${isFirstSync ? "longest" : "default"}`);
+  console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions, dateFrom=${dateFrom}`);
 
   let imported = 0;
   let skipped = 0;
