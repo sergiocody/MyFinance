@@ -773,19 +773,26 @@ export default function TransactionsPage() {
 
                     <div className="flex items-center justify-between gap-3 text-xs">
                       <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Category</span>
-                      {tx.categories ? (
-                        <span
-                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                          style={{
-                            backgroundColor: tx.categories.color + "20",
-                            color: tx.categories.color,
-                          }}
-                        >
-                          {tx.categories.name}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
+                      <select
+                        value={tx.category_id ?? ""}
+                        onChange={async (e) => {
+                          const newCatId = e.target.value || null;
+                          await supabase.from("transactions").update({ category_id: newCatId }).eq("id", tx.id);
+                          loadTransactions();
+                        }}
+                        className="rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+                        style={tx.categories ? {
+                          backgroundColor: tx.categories.color + "20",
+                          color: tx.categories.color,
+                        } : undefined}
+                      >
+                        <option value="">—</option>
+                        {categories
+                          .filter(c => c.type === tx.type || tx.type === "transfer")
+                          .map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                      </select>
                     </div>
 
                     {tx.transaction_labels && tx.transaction_labels.length > 0 && (
@@ -911,19 +918,26 @@ export default function TransactionsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {tx.categories ? (
-                      <span
-                        className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                        style={{
-                          backgroundColor: tx.categories.color + "20",
-                          color: tx.categories.color,
-                        }}
-                      >
-                        {tx.categories.name}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                    <select
+                      value={tx.category_id ?? ""}
+                      onChange={async (e) => {
+                        const newCatId = e.target.value || null;
+                        await supabase.from("transactions").update({ category_id: newCatId }).eq("id", tx.id);
+                        loadTransactions();
+                      }}
+                      className="rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+                      style={tx.categories ? {
+                        backgroundColor: tx.categories.color + "20",
+                        color: tx.categories.color,
+                      } : undefined}
+                    >
+                      <option value="">—</option>
+                      {categories
+                        .filter(c => c.type === tx.type || tx.type === "transfer")
+                        .map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
