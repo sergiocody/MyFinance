@@ -24,9 +24,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import type { Account, Category } from "@/lib/database.types";
@@ -343,28 +340,37 @@ export default function Dashboard() {
         <Card className="min-w-0">
           <h3 className="font-label mb-4 text-[11px] text-(--color-secondary)">Expenses by Category (This Month)</h3>
           {categoryData.length > 0 ? (
-            <div className="h-64 min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${formatCurrency(value)}`}
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={tooltipCurrency} />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="space-y-3">
+              {(() => {
+                const total = categoryData.reduce((s, c) => s + c.value, 0);
+                return categoryData.map((cat) => (
+                  <div key={cat.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                        <span className="text-(--color-primary)">{cat.name}</span>
+                      </div>
+                      <span className="font-medium text-(--color-primary)">{formatCurrency(cat.value)}</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${((cat.value / total) * 100).toFixed(1)}%`,
+                          backgroundColor: cat.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ));
+              })()}
+              <div className="mt-3 border-t border-(--color-border) pt-3 flex items-center justify-between text-sm font-semibold">
+                <span className="text-(--color-secondary)">Total</span>
+                <span className="text-(--color-primary)">{formatCurrency(categoryData.reduce((s, c) => s + c.value, 0))}</span>
+              </div>
             </div>
           ) : (
-            <div className="flex h-64 items-center justify-center text-sm text-(--color-secondary)">
+            <div className="flex h-32 items-center justify-center text-sm text-(--color-secondary)">
               No expenses this month
             </div>
           )}
