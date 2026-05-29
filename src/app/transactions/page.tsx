@@ -734,10 +734,12 @@ export default function TransactionsPage() {
                           ? "text-green-600"
                           : tx.type === "expense"
                             ? "text-red-600"
-                            : "text-blue-600"
+                            : tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount
+                              ? "text-green-600"
+                              : "text-blue-600"
                       }`}
                     >
-                      {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : ""}
+                      {tx.type === "income" || (tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount) ? "+" : tx.type === "expense" ? "-" : tx.type === "transfer" ? "-" : ""}
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </div>
@@ -917,10 +919,12 @@ export default function TransactionsPage() {
                           ? "text-green-600"
                           : tx.type === "expense"
                           ? "text-red-600"
+                          : tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount
+                          ? "text-green-600"
                           : "text-blue-600"
                       }
                     >
-                      {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : ""}
+                      {tx.type === "income" || (tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount) ? "+" : tx.type === "expense" || tx.type === "transfer" ? "-" : ""}
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </td>
@@ -1180,6 +1184,11 @@ export default function TransactionsPage() {
                     {selectedDestinationAccount && (
                       <p className="mt-2 text-xs text-slate-500">
                         Funds move to {selectedDestinationAccount.name}
+                      </p>
+                    )}
+                    {selectedDestinationAccount?.account_mode === "automated" && (
+                      <p className="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                        ⚠️ This account is synced with a bank. The transfer may also be imported automatically during sync, which could cause a duplicate.
                       </p>
                     )}
                   </div>

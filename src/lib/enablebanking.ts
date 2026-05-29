@@ -280,6 +280,27 @@ function deriveTransactionType(indicator: "CRDT" | "DBIT"): "income" | "expense"
 }
 
 /**
+ * Keywords that indicate a transaction is a transfer between own accounts.
+ */
+const TRANSFER_KEYWORDS = [
+  "transferencia emitida",
+  "transferencia recibida",
+  "traspaso",
+  "transfer to",
+  "transfer from",
+  "trasferencia",
+  "trasp.",
+];
+
+/**
+ * Checks if a description indicates a transfer between own accounts.
+ */
+function isTransferDescription(description: string): boolean {
+  const lower = description.toLowerCase();
+  return TRANSFER_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+/**
  * Extracts a human-readable description from an Enable Banking transaction.
  */
 function extractDescription(tx: EnableBankingTransaction): string {
@@ -371,6 +392,12 @@ export async function syncAccountTransactions(
 
   console.log(`[sync] accountId=${accountId} fetched ${transactions.length} transactions, dateFrom=${dateFrom}`);
 
+  // Load user's other accounts to match transfers
+  const { data: userAccounts } = await db
+    .from("accounts")
+    .select("id, name, bank_name")
+    .neq("id", accountId);
+
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -381,9 +408,26 @@ export async function syncAccountTransactions(
 
     const externalId = tx.entry_reference || tx.transaction_id || `${tx.booking_date}_${tx.transaction_amount.amount}_${extractDescription(tx).slice(0, 50)}`;
     const amount = Math.abs(parseFloat(tx.transaction_amount.amount));
-    const type = deriveTransactionType(tx.credit_debit_indicator);
+    let type: "income" | "expense" | "transfer" = deriveTransactionType(tx.credit_debit_indicator);
     const description = extractDescription(tx);
     const date = tx.booking_date || tx.value_date || tx.transaction_date || new Date().toISOString().split("T")[0];
+
+    // Detect transfers by description keywords
+    let transferToAccountId: string | null = null;
+    if (isTransferDescription(description) && tx.credit_debit_indicator === "DBIT") {
+      type = "transfer";
+      // Try to match destination account by name in description
+      if (userAccounts) {
+        const descLower = description.toLowerCase();
+        const matched = userAccounts.find(a => {
+          const nameWords = a.name.toLowerCase().split(/\s+/);
+          return nameWords.some(word => word.length > 3 && descLower.includes(word));
+        });
+        if (matched) {
+          transferToAccountId = matched.id;
+        }
+      }
+    }
 
     const { error } = await db.from("transactions").insert({
       account_id: accountId,
@@ -394,6 +438,7 @@ export async function syncAccountTransactions(
       date,
       source: "sync",
       external_id: externalId,
+      transfer_to_account_id: transferToAccountId,
     });
 
     if (error) {
