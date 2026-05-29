@@ -543,6 +543,31 @@ export default function AccountsPage() {
     loadAccounts();
   }
 
+  async function confirmDeleteAll() {
+    if (!deleteModal) return;
+    const sourceId = deleteModal.account.id;
+
+    // Clear transfer references in other accounts' transactions
+    await supabase
+      .from("transactions")
+      .update({ transfer_to_account_id: null })
+      .eq("transfer_to_account_id", sourceId);
+
+    // Clear imports reference
+    await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
+
+    // Delete account (CASCADE deletes transactions + bank_connections)
+    const { error } = await supabase.from("accounts").delete().eq("id", sourceId);
+
+    setDeleteModal(null);
+    if (error) {
+      showToast("error", `Failed to delete: ${error.message}`);
+    } else {
+      showToast("success", `Account and ${deleteModal.txCount} transactions deleted.`);
+    }
+    loadAccounts();
+  }
+
   async function toggleActive(account: Account) {
     await supabase
       .from("accounts")
@@ -998,14 +1023,16 @@ export default function AccountsPage() {
             <p className="text-sm text-gray-700">
               <strong>{deleteModal.account.name}</strong> has{" "}
               <strong>{deleteModal.txCount}</strong> linked transactions.
-              Select another account to move them to:
+            </p>
+            <p className="text-sm text-gray-600">
+              Move them to another account, or delete everything:
             </p>
             <select
               value={migrateTarget}
               onChange={(e) => setMigrateTarget(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
-              <option value="">Select account...</option>
+              <option value="">Select account to migrate...</option>
               {accounts
                 .filter((a) => a.id !== deleteModal.account.id)
                 .map((a) => (
@@ -1021,6 +1048,13 @@ export default function AccountsPage() {
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAll}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              >
+                Delete All
               </button>
               <button
                 type="button"
