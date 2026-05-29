@@ -369,6 +369,8 @@ export default function TransactionsPage() {
         .update({
           category_id: form.category_id || null,
           notes: form.notes || null,
+          type: form.type,
+          transfer_to_account_id: form.type === "transfer" ? (form.transfer_to_account_id || null) : null,
         })
         .eq("id", editing.id);
 
