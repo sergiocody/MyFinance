@@ -421,5 +421,6 @@ export type Import = Database["public"]["Tables"]["imports"]["Row"];
 export type TransactionWithRelations = Transaction & {
   categories: Category | null;
   accounts: Account;
+  destination_account: Account | null;
   transaction_labels: { labels: Label }[];
 };

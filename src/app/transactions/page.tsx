@@ -226,7 +226,7 @@ export default function TransactionsPage() {
     let query = supabase
       .from("transactions")
       .select(
-        "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), transaction_labels(labels(*))",
+        "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), destination_account:accounts!transactions_transfer_to_account_id_fkey(*), transaction_labels(labels(*))",
         { count: "exact" }
       )
       .order("date", { ascending: false })
@@ -756,6 +756,19 @@ export default function TransactionsPage() {
                       </div>
                     </div>
 
+                    {tx.destination_account && (
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Destination</span>
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <div
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: tx.destination_account.color }}
+                          />
+                          <span>{tx.destination_account.name}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between gap-3 text-xs">
                       <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Category</span>
                       {tx.categories ? (
@@ -841,6 +854,7 @@ export default function TransactionsPage() {
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3">Account</th>
+              <th className="px-4 py-3">Destination</th>
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Labels</th>
               <th className="px-4 py-3 text-right">Amount</th>
@@ -880,6 +894,19 @@ export default function TransactionsPage() {
                       />
                       <span className="text-gray-600">{tx.accounts?.name}</span>
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {tx.destination_account ? (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: tx.destination_account.color }}
+                        />
+                        <span className="text-gray-600">{tx.destination_account.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {tx.categories ? (
