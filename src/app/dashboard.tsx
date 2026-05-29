@@ -35,7 +35,7 @@ type TransactionAmountRow = {
 
 type TransactionCategoryRow = {
   amount: number;
-  categories: Pick<Category, "name" | "color"> | null;
+  categories: Pick<Category, "id" | "name" | "color"> | null;
 };
 
 function tooltipCurrency(
@@ -52,6 +52,7 @@ interface MonthlySummary {
 }
 
 interface CategorySummary {
+  id: string;
   name: string;
   value: number;
   color: string;
@@ -175,25 +176,26 @@ export default function Dashboard() {
 
     const { data: catTx } = await supabase
       .from("transactions")
-      .select("amount, categories(name, color)")
+      .select("amount, categories(id, name, color)")
       .eq("type", "expense")
       .gte("date", monthStart)
       .lte("date", monthEnd);
 
     if (catTx) {
       const typedCategoryRows = catTx as TransactionCategoryRow[];
-      const catMap = new Map<string, { value: number; color: string }>();
+      const catMap = new Map<string, { id: string; value: number; color: string }>();
       for (const t of typedCategoryRows) {
         const cat = t.categories;
+        const id = cat?.id ?? "uncategorized";
         const name = cat?.name ?? "Uncategorized";
         const color = cat?.color ?? "#94a3b8";
-        const existing = catMap.get(name) ?? { value: 0, color };
+        const existing = catMap.get(name) ?? { id, value: 0, color };
         existing.value += Number(t.amount);
         catMap.set(name, existing);
       }
       setCategoryData(
         Array.from(catMap.entries())
-          .map(([name, { value, color }]) => ({ name, value, color }))
+          .map(([name, { id, value, color }]) => ({ id, name, value, color }))
           .sort((a, b) => b.value - a.value)
       );
     }
@@ -344,7 +346,11 @@ export default function Dashboard() {
               {(() => {
                 const total = categoryData.reduce((s, c) => s + c.value, 0);
                 return categoryData.map((cat) => (
-                  <div key={cat.name} className="space-y-1">
+                  <Link
+                    key={cat.name}
+                    href={cat.id !== "uncategorized" ? `/transactions?category=${cat.id}&type=expense` : `/transactions?type=expense`}
+                    className="block space-y-1 rounded-lg px-2 py-1.5 -mx-2 transition hover:bg-gray-50"
+                  >
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
@@ -361,7 +367,7 @@ export default function Dashboard() {
                         }}
                       />
                     </div>
-                  </div>
+                  </Link>
                 ));
               })()}
               <div className="mt-3 border-t border-(--color-border) pt-3 flex items-center justify-between text-sm font-semibold">

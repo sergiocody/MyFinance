@@ -182,6 +182,8 @@ export default function TransactionsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const accountParam = searchParams.get("account") ?? "";
+  const categoryParam = searchParams.get("category") ?? "";
+  const typeParam = (searchParams.get("type") ?? "") as TransactionFilterType;
   const composeFlow = normalizeFlowType(searchParams.get("flow"));
   const shouldOpenComposer = searchParams.get("new") === "1";
 
@@ -199,11 +201,11 @@ export default function TransactionsPage() {
 
   // Filters
   const [filterAccount, setFilterAccount] = useState(accountParam);
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterType, setFilterType] = useState<TransactionFilterType>("");
+  const [filterCategory, setFilterCategory] = useState(categoryParam);
+  const [filterType, setFilterType] = useState<TransactionFilterType>(typeParam);
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [showFilters, setShowFilters] = useState(Boolean(accountParam));
+  const [showFilters, setShowFilters] = useState(Boolean(accountParam || categoryParam || typeParam));
   const [formError, setFormError] = useState("");
   const [loadError, setLoadError] = useState("");
 
