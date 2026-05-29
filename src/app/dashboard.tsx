@@ -105,7 +105,11 @@ export default function Dashboard() {
     if (accts) {
       const typedAccounts = accts as Account[];
       setAccounts(typedAccounts);
-      setTotalBalance(typedAccounts.reduce((sum, a) => sum + Number(a.current_balance), 0));
+      setTotalBalance(
+        typedAccounts
+          .filter(a => a.account_class !== "investment")
+          .reduce((sum, a) => sum + Number(a.current_balance), 0)
+      );
 
       // Compute effective balances: parent accounts subtract children's balances
       const childBalanceByParent = new Map<string, number>();
@@ -121,8 +125,9 @@ export default function Dashboard() {
       let remBal = 0;
       let nonRemBal = 0;
       for (const a of typedAccounts) {
+        if (a.account_class === "investment") continue;
         const effectiveBalance = Number(a.current_balance) - (childBalanceByParent.get(a.id) ?? 0);
-        if (a.is_remunerated) {
+        if (a.account_class === "remunerated") {
           remBal += Number(a.current_balance);
         } else {
           nonRemBal += effectiveBalance;
@@ -307,7 +312,7 @@ export default function Dashboard() {
           </CardHeader>
           <p className="text-2xl font-semibold text-(--color-primary)">{formatCurrency(remuneratedBalance)}</p>
           <p className="mt-1 text-xs text-(--color-secondary)">
-            {accounts.filter(a => a.is_remunerated).length} account{accounts.filter(a => a.is_remunerated).length !== 1 ? "s" : ""}
+            {accounts.filter(a => a.account_class === "remunerated").length} account{accounts.filter(a => a.account_class === "remunerated").length !== 1 ? "s" : ""}
           </p>
         </Card>
         <Card>
@@ -317,7 +322,7 @@ export default function Dashboard() {
           </CardHeader>
           <p className="text-2xl font-semibold text-(--color-primary)">{formatCurrency(nonRemuneratedBalance)}</p>
           <p className="mt-1 text-xs text-(--color-secondary)">
-            {accounts.filter(a => !a.is_remunerated).length} account{accounts.filter(a => !a.is_remunerated).length !== 1 ? "s" : ""}
+            {accounts.filter(a => a.account_class === "standard").length} account{accounts.filter(a => a.account_class === "standard").length !== 1 ? "s" : ""}
           </p>
         </Card>
       </div>

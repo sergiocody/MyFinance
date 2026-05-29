@@ -374,7 +374,7 @@ export default function AccountsPage() {
     color: "#3b82f6",
     currency: "EUR",
     account_mode: "manual" as "manual" | "automated",
-    is_remunerated: false,
+    account_class: "standard" as "standard" | "remunerated" | "investment",
     parent_account_id: "" as string,
   });
 
@@ -429,7 +429,7 @@ export default function AccountsPage() {
       color: "#3b82f6",
       currency: "EUR",
       account_mode: "manual",
-      is_remunerated: false,
+      account_class: "standard",
       parent_account_id: "",
     });
     setModalOpen(true);
@@ -445,7 +445,7 @@ export default function AccountsPage() {
       color: account.color,
       currency: account.currency,
       account_mode: account.account_mode,
-      is_remunerated: account.is_remunerated,
+      account_class: account.account_class,
       parent_account_id: account.parent_account_id ?? "",
     });
     setModalOpen(true);
@@ -464,7 +464,7 @@ export default function AccountsPage() {
           bank_name: form.bank_name || null,
           color: form.color,
           currency: form.currency,
-          is_remunerated: form.is_remunerated,
+          account_class: form.account_class,
           parent_account_id: form.parent_account_id || null,
         })
         .eq("id", editing.id);
@@ -478,7 +478,7 @@ export default function AccountsPage() {
         color: form.color,
         currency: form.currency,
         account_mode: form.account_mode,
-        is_remunerated: form.is_remunerated,
+        account_class: form.account_class,
         parent_account_id: form.parent_account_id || null,
       });
     }
@@ -1004,17 +1004,17 @@ export default function AccountsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={form.is_remunerated}
-                onChange={(e) => setForm({ ...form, is_remunerated: e.target.checked })}
-                className="peer sr-only"
-              />
-              <div className="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-full peer-checked:after:border-white" />
-            </label>
-            <span className="text-sm font-medium text-gray-700">Remunerated account</span>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Account class</label>
+            <select
+              value={form.account_class}
+              onChange={(e) => setForm({ ...form, account_class: e.target.value as "standard" | "remunerated" | "investment" })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="standard">Non-remunerated</option>
+              <option value="remunerated">Remunerated</option>
+              <option value="investment">Investment</option>
+            </select>
           </div>
 
           <div>
