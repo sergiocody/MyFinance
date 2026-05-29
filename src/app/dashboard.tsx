@@ -345,10 +345,15 @@ export default function Dashboard() {
             <div className="space-y-3">
               {(() => {
                 const total = categoryData.reduce((s, c) => s + c.value, 0);
+                const now = new Date();
+                const from = startOfMonth(now).toISOString().split("T")[0];
+                const to = endOfMonth(now).toISOString().split("T")[0];
                 return categoryData.map((cat) => (
                   <Link
                     key={cat.name}
-                    href={cat.id !== "uncategorized" ? `/transactions?category=${cat.id}&type=expense` : `/transactions?type=expense`}
+                    href={cat.id !== "uncategorized"
+                      ? `/transactions?category=${cat.id}&type=expense&from=${from}&to=${to}`
+                      : `/transactions?type=expense&from=${from}&to=${to}`}
                     className="block space-y-1 rounded-lg px-2 py-1.5 -mx-2 transition hover:bg-gray-50"
                   >
                     <div className="flex items-center justify-between text-sm">
