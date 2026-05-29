@@ -361,6 +361,7 @@ export default function AccountsPage() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [connectAccountId, setConnectAccountId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ account: Account; txCount: number } | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<string>("");
@@ -620,6 +621,37 @@ export default function AccountsPage() {
     }
   }
 
+  async function handleSyncAll() {
+    const automated = accounts.filter(a => a.account_mode === "automated");
+    if (automated.length === 0) return;
+    setSyncingAll(true);
+    let success = 0;
+    let failed = 0;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSyncingAll(false); return; }
+
+    for (const account of automated) {
+      setSyncing(account.id);
+      try {
+        const res = await fetch("/api/banking/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ accountId: account.id }),
+        });
+        if (res.ok) success++; else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    setSyncing(null);
+    setSyncingAll(false);
+    loadAccounts();
+    showToast("success", `Sync complete: ${success} OK${failed ? `, ${failed} failed` : ""}`);
+  }
+
   async function handleConnectBank(accountId: string) {
     setConnectAccountId(accountId);
     setConnectModalOpen(true);
@@ -648,13 +680,25 @@ export default function AccountsPage() {
       )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          <Plus size={16} />
-          Add Account
-        </button>
+        <div className="flex items-center gap-2">
+          {accounts.some(a => a.account_mode === "automated") && (
+            <button
+              onClick={handleSyncAll}
+              disabled={syncingAll}
+              className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={syncingAll ? "animate-spin" : ""} />
+              Sync All
+            </button>
+          )}
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            <Plus size={16} />
+            Add Account
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
