@@ -133,8 +133,8 @@ export default function Dashboard() {
     }
 
     const now = new Date();
-    const monthStart = startOfMonth(now).toISOString().split("T")[0];
-    const monthEnd = endOfMonth(now).toISOString().split("T")[0];
+    const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+    const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
 
     const { data: monthTx } = await supabase
       .from("transactions")
@@ -155,8 +155,8 @@ export default function Dashboard() {
     const months: MonthlySummary[] = [];
     for (let i = 5; i >= 0; i--) {
       const m = subMonths(now, i);
-      const mStart = startOfMonth(m).toISOString().split("T")[0];
-      const mEnd = endOfMonth(m).toISOString().split("T")[0];
+      const mStart = format(startOfMonth(m), "yyyy-MM-dd");
+      const mEnd = format(endOfMonth(m), "yyyy-MM-dd");
 
       const { data: mTx } = await supabase
         .from("transactions")
@@ -346,8 +346,8 @@ export default function Dashboard() {
               {(() => {
                 const total = categoryData.reduce((s, c) => s + c.value, 0);
                 const now = new Date();
-                const from = startOfMonth(now).toISOString().split("T")[0];
-                const to = endOfMonth(now).toISOString().split("T")[0];
+                const from = format(startOfMonth(now), "yyyy-MM-dd");
+                const to = format(endOfMonth(now), "yyyy-MM-dd");
                 return categoryData.map((cat) => (
                   <Link
                     key={cat.name}
