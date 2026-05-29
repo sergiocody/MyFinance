@@ -466,6 +466,62 @@ export default function TransactionsPage() {
     loadTransactions();
   }
 
+  const [categorizing, setCategorizing] = useState(false);
+
+  async function handleAutoCategorize() {
+    const uncategorized = transactions.filter(tx => !tx.category_id && tx.description);
+    if (uncategorized.length === 0) return;
+
+    setCategorizing(true);
+    let updated = 0;
+
+    // Get all categorized transactions to build a description→category map
+    const { data: categorized } = await supabase
+      .from("transactions")
+      .select("description, category_id")
+      .not("category_id", "is", null)
+      .not("description", "is", null);
+
+    if (!categorized || categorized.length === 0) {
+      setCategorizing(false);
+      return;
+    }
+
+    // Build map: normalized description → category_id (most common)
+    const descCatMap = new Map<string, Map<string, number>>();
+    for (const row of categorized) {
+      const key = (row.description ?? "").trim().toLowerCase();
+      if (!key) continue;
+      if (!descCatMap.has(key)) descCatMap.set(key, new Map());
+      const catCounts = descCatMap.get(key)!;
+      catCounts.set(row.category_id!, (catCounts.get(row.category_id!) ?? 0) + 1);
+    }
+
+    // Resolve best category per description
+    const bestCat = new Map<string, string>();
+    for (const [desc, catCounts] of descCatMap) {
+      let best = "";
+      let bestCount = 0;
+      for (const [catId, count] of catCounts) {
+        if (count > bestCount) { best = catId; bestCount = count; }
+      }
+      if (best) bestCat.set(desc, best);
+    }
+
+    // Match uncategorized transactions
+    for (const tx of uncategorized) {
+      const key = (tx.description ?? "").trim().toLowerCase();
+      const matchedCat = bestCat.get(key);
+      if (matchedCat) {
+        await supabase.from("transactions").update({ category_id: matchedCat }).eq("id", tx.id);
+        updated++;
+      }
+    }
+
+    setCategorizing(false);
+    loadTransactions();
+  }
+
   function resetFilters() {
     setFilterAccount("");
     setFilterCategory("");
@@ -575,6 +631,14 @@ export default function TransactionsPage() {
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={handleAutoCategorize}
+            disabled={categorizing || transactions.filter(tx => !tx.category_id).length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+          >
+            <Tags size={16} className={categorizing ? "animate-pulse" : ""} />
+            Auto-cat
           </button>
           <button
             onClick={() => openCreate("expense")}
