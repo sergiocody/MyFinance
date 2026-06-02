@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   Download,
   LayoutDashboard,
@@ -59,8 +60,8 @@ export default function Sidebar() {
         )}
       >
         <div className="flex h-20 items-center gap-3 border-b border-[var(--color-border)] px-6">
-          <div className="rounded-lg bg-[var(--color-primary)] p-2 text-[var(--color-neutral)]">
-            <Wallet className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-transparent">
+            <Image src="/Myfinance.png" alt="MyFinance Logo" width={36} height={36} className="h-9 w-9 object-contain" />
           </div>
           <div>
             <p className="font-label text-[10px] text-[var(--color-secondary)]">Heritage</p>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader, CardTitle } from "@/components/Card";
 import { formatCurrency } from "@/lib/utils";
@@ -225,12 +226,17 @@ export default function Dashboard() {
     <div className="space-y-8 pt-12 lg:pt-0">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="font-label text-[11px] text-(--color-secondary)">Overview</p>
-            <h1 className="mt-2 text-3xl font-semibold text-(--color-primary)">Dashboard</h1>
-            <p className="mt-1 text-sm text-(--color-secondary)">
-              Start with a quick expense entry, or jump straight into income and transfer flows.
-            </p>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 mt-1">
+              <Image src="/Myfinance.png" alt="MyFinance Logo" width={48} height={48} className="h-12 w-12 object-contain" />
+            </div>
+            <div>
+              <p className="font-label text-[11px] text-(--color-secondary)">Overview</p>
+              <h1 className="mt-1 text-3xl font-semibold text-(--color-primary)">Dashboard</h1>
+              <p className="mt-1 text-sm text-(--color-secondary)">
+                Start with a quick expense entry, or jump straight into income and transfer flows.
+              </p>
+            </div>
           </div>
           <Link
             href="/transactions?new=1&flow=expense"

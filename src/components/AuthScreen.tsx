@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Wallet } from "lucide-react";
+import Image from "next/image";
 import { useAuth } from "@/components/AuthProvider";
 import { isSignUpEnabled } from "@/lib/supabase";
 
@@ -61,8 +61,8 @@ export default function AuthScreen() {
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(184,66,46,0.12),_transparent_28%),linear-gradient(180deg,_#faf8f4_0%,_#f7f5f2_100%)] px-4 py-10">
       <div className="surface-card-strong w-full max-w-md rounded-lg p-8">
         <div className="mb-8 flex items-center gap-3">
-          <div className="rounded-lg bg-[var(--color-primary)] p-3 text-[var(--color-neutral)]">
-            <Wallet className="h-6 w-6" />
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-transparent">
+            <Image src="/Myfinance.png" alt="MyFinance Logo" width={48} height={48} className="h-12 w-12 object-contain" />
           </div>
           <div>
             <p className="font-label text-[11px] text-[var(--color-secondary)]">Heritage Access</p>
