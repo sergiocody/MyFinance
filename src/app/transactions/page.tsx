@@ -364,7 +364,8 @@ export default function TransactionsPage() {
       return;
     }
 
-    // For synced transactions, only allow updating category, labels, and notes
+    // For synced transactions, only allow updating category, labels, notes,
+    // type, and account_id/transfer_to_account_id (to convert income→transfer)
     const isSyncedEdit = editing && editing.source === "sync";
 
     if (isSyncedEdit) {
@@ -375,6 +376,9 @@ export default function TransactionsPage() {
           notes: form.notes || null,
           type: form.type,
           transfer_to_account_id: form.type === "transfer" ? (form.transfer_to_account_id || null) : null,
+          // Allow changing account_id when converting to a transfer
+          // (e.g. income on synced account → transfer from another account to this one)
+          ...(form.type === "transfer" ? { account_id: form.account_id } : {}),
         })
         .eq("id", editing.id);
 
@@ -1138,15 +1142,26 @@ export default function TransactionsPage() {
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        const isSyncedIncomeToTransfer =
+                          editing?.source === "sync" &&
+                          editing.type === "income" &&
+                          option.value === "transfer";
+
                         setForm({
                           ...form,
                           type: option.value,
                           category_id: "",
+                          // When converting synced income → transfer, pre-fill the
+                          // synced account as destination and clear the source so the
+                          // user picks the origin account.
+                          account_id: isSyncedIncomeToTransfer ? "" : form.account_id,
                           transfer_to_account_id:
-                            option.value === "transfer" ? form.transfer_to_account_id : "",
-                        })
-                      }
+                            option.value === "transfer"
+                              ? (isSyncedIncomeToTransfer ? editing.account_id : form.transfer_to_account_id)
+                              : "",
+                        });
+                      }}
                       className={`rounded-2xl border px-3 py-3 text-left transition ${
                         form.type === option.value
                           ? option.activeClassName
