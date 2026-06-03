@@ -792,8 +792,8 @@ export default function TransactionsPage() {
               {transactions.map((tx) => (
                 <div key={tx.id} className="space-y-4 px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate" title={tx.description || "Untitled transaction"}>
                         {tx.description || "Untitled transaction"}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">{formatDate(tx.date)}</p>
@@ -957,10 +957,10 @@ export default function TransactionsPage() {
                   <td className="whitespace-nowrap px-4 py-3 text-gray-500">
                     {formatDate(tx.date)}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{tx.description || "—"}</p>
+                  <td className="px-4 py-3 max-w-[180px] sm:max-w-[240px] md:max-w-[320px]">
+                    <p className="font-medium text-gray-900 truncate" title={tx.description || "—"}>{tx.description || "—"}</p>
                     {tx.notes && (
-                      <p className="text-xs text-gray-400">{tx.notes}</p>
+                      <p className="text-xs text-gray-400 truncate" title={tx.notes}>{tx.notes}</p>
                     )}
                   </td>
                   <td className="px-4 py-3">
