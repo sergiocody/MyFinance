@@ -270,6 +270,13 @@ export async function getAccountBalances(accountUid: string): Promise<{
   return apiGet(`/accounts/${accountUid}/balances`);
 }
 
+/**
+ * Fetches account details.
+ */
+export async function getAccountDetails(accountUid: string): Promise<EnableBankingAccount> {
+  return apiGet(`/accounts/${accountUid}`);
+}
+
 // --- Transaction Sync Logic ---
 
 /**
@@ -357,6 +364,33 @@ export async function syncAccountTransactions(
       .update({ status: "expired", updated_at: new Date().toISOString() })
       .eq("id", connection.id);
     throw new Error("Bank session has expired. Please reconnect your bank account.");
+  }
+
+  const { data: syncedAccount } = await db
+    .from("accounts")
+    .select("iban")
+    .eq("id", accountId)
+    .eq("user_id", userId)
+    .single();
+
+  if (!syncedAccount?.iban) {
+    try {
+      const accountDetails = await getAccountDetails(connection.external_account_uid);
+      const iban = accountDetails.account_id?.iban;
+
+      if (iban) {
+        await db
+          .from("accounts")
+          .update({ iban })
+          .eq("id", accountId)
+          .eq("user_id", userId);
+      }
+    } catch (error) {
+      console.warn(
+        `[sync] could not fetch account IBAN for ${accountId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   // First sync: try 2 years, fallback to 89 days if bank rejects
