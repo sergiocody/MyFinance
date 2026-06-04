@@ -71,10 +71,12 @@ export async function GET(request: NextRequest) {
         p_error_message: null,
       });
 
-      await dbClient
-        .from("accounts")
-        .update({ iban: linkedAccount.account_id?.iban || null })
-        .eq("id", accountId);
+      if (linkedAccount.account_id?.iban) {
+        await dbClient.rpc("update_connected_account_iban", {
+          p_connection_id: connection.id,
+          p_iban: linkedAccount.account_id.iban,
+        });
+      }
 
       return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
     }

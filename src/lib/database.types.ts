@@ -31,6 +31,13 @@ export type Database = {
         };
         Returns: undefined;
       };
+      update_connected_account_iban: {
+        Args: {
+          p_connection_id: string;
+          p_iban: string;
+        };
+        Returns: undefined;
+      };
       set_bank_connection_error: {
         Args: {
           p_connection_id: string;
