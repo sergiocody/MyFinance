@@ -395,7 +395,7 @@ export async function syncAccountTransactions(
   // Load user's other accounts to match transfers
   const { data: userAccounts } = await db
     .from("accounts")
-    .select("id, name, bank_name")
+    .select("id, name, bank_name, iban")
     .neq("id", accountId);
 
   let imported = 0;
@@ -411,15 +411,26 @@ export async function syncAccountTransactions(
     let type: "income" | "expense" | "transfer" = deriveTransactionType(tx.credit_debit_indicator);
     const description = extractDescription(tx);
     const date = tx.booking_date || tx.value_date || tx.transaction_date || new Date().toISOString().split("T")[0];
+    let sourceAccountId = accountId;
 
-    // Detect transfers by description keywords
+    // Detect transfers by known account names or IBANs in the description
     let transferToAccountId: string | null = null;
-    if (isTransferDescription(description) && tx.credit_debit_indicator === "DBIT") {
+    const compactDescription = description.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const matchedByIban = userAccounts?.find(a => {
+      const normalizedIban = (a.iban ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      return normalizedIban && compactDescription.includes(normalizedIban);
+    }) ?? null;
+
+    if ((isTransferDescription(description) || matchedByIban) && tx.credit_debit_indicator === "DBIT") {
       type = "transfer";
-      // Try to match destination account by name in description
       if (userAccounts) {
         const descLower = description.toLowerCase();
-        const matched = userAccounts.find(a => {
+        const matched = matchedByIban ?? userAccounts.find(a => {
+          const normalizedIban = (a.iban ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          if (normalizedIban && compactDescription.includes(normalizedIban)) {
+            return true;
+          }
+
           const nameWords = a.name.toLowerCase().split(/\s+/);
           return nameWords.some(word => word.length > 3 && descLower.includes(word));
         });
@@ -429,8 +440,14 @@ export async function syncAccountTransactions(
       }
     }
 
+    if (tx.credit_debit_indicator === "CRDT" && matchedByIban) {
+        type = "transfer";
+        sourceAccountId = matchedByIban.id;
+        transferToAccountId = accountId;
+    }
+
     const { error } = await db.from("transactions").insert({
-      account_id: accountId,
+      account_id: sourceAccountId,
       user_id: userId,
       type,
       amount,

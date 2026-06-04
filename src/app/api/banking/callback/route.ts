@@ -71,6 +71,11 @@ export async function GET(request: NextRequest) {
         p_error_message: null,
       });
 
+      await dbClient
+        .from("accounts")
+        .update({ iban: linkedAccount.account_id?.iban || null })
+        .eq("id", accountId);
+
       return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
     }
 

@@ -357,6 +357,7 @@ export default function ImportPage() {
               id: account.id,
               name: account.name,
               bank_name: account.bank_name,
+              iban: account.iban,
               type: account.type,
             })),
             accountId: selectedAccount,

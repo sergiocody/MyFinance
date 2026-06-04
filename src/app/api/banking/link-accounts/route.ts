@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
               name: accountName,
               currency: bankAccount.currency || originalAccount.currency,
               bank_name: institution,
+              iban: bankAccount.iban || null,
             })
             .eq("id", originalAccountId);
         }
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
             type: originalAccount.type,
             currency: bankAccount.currency || originalAccount.currency,
             bank_name: institution,
+            iban: bankAccount.iban || null,
             color: originalAccount.color,
             account_mode: "automated",
             initial_balance: 0,

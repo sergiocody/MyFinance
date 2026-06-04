@@ -21,6 +21,7 @@ type AccountOption = {
   id: string;
   name: string;
   bank_name?: string | null;
+  iban?: string | null;
   type: string;
 };
 
@@ -333,21 +334,42 @@ function enrichTransactions(
   labels: LabelOption[],
   accounts: AccountOption[]
 ) {
-  return transactions.map((transaction) => ({
-    ...transaction,
-    category_id:
-      transaction.category_id ??
-      matchCategoryId(transaction.description, transaction.type, categories),
-    label_ids:
-      transaction.label_ids.length > 0
-        ? transaction.label_ids
-        : matchLabelIds(transaction.description, labels),
-    transfer_account_id:
-      transaction.type === "transfer"
-        ? transaction.transfer_account_id ??
-          matchTransferAccountId(transaction.description, transaction.notes, accounts)
-        : null,
-  }));
+  return transactions.map((transaction) => {
+    const matchedByAccountNumber = matchTransferAccountNumberId(
+      transaction.description,
+      transaction.notes,
+      accounts
+    );
+    const matchedTransferAccountId =
+      transaction.transfer_account_id ??
+      (transaction.type === "transfer"
+        ? matchTransferAccountId(transaction.description, transaction.notes, accounts)
+        : matchedByAccountNumber);
+    const type = matchedByAccountNumber || transaction.transfer_account_id || transaction.type === "transfer"
+      ? "transfer"
+      : transaction.type;
+    const selectedAccountRole =
+      type === "transfer"
+        ? transaction.selected_account_role ??
+          (transaction.type === "income" ? "destination" : "source")
+        : null;
+
+    return {
+      ...transaction,
+      type,
+      category_id:
+        type === "transfer"
+          ? matchCategoryId(transaction.description, type, categories)
+          : transaction.category_id ??
+            matchCategoryId(transaction.description, type, categories),
+      label_ids:
+        transaction.label_ids.length > 0
+          ? transaction.label_ids
+          : matchLabelIds(transaction.description, labels),
+      transfer_account_id: type === "transfer" ? matchedTransferAccountId : null,
+      selected_account_role: selectedAccountRole,
+    };
+  });
 }
 
 function normalizeText(value: string) {
@@ -356,6 +378,10 @@ function normalizeText(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+function normalizeAccountNumber(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 }
 
 function parseLocaleNumber(value: string) {
@@ -532,6 +558,11 @@ function matchTransferAccountId(
 ) {
   const haystack = normalizeText(`${description} ${notes}`);
   const keywords = ["transfer", "traspaso", "transferencia", "from ", "to "];
+  const matchedByAccountNumber = matchTransferAccountNumberId(description, notes, accounts);
+
+  if (matchedByAccountNumber) {
+    return matchedByAccountNumber;
+  }
 
   const matchedAccount = accounts.find((account) => {
     const accountTerms = [account.name, account.bank_name ?? "", account.type]
@@ -546,6 +577,19 @@ function matchTransferAccountId(
   }
 
   return keywords.some((keyword) => haystack.includes(keyword)) ? null : null;
+}
+
+function matchTransferAccountNumberId(
+  description: string,
+  notes: string,
+  accounts: AccountOption[]
+) {
+  const accountNumberHaystack = normalizeAccountNumber(`${description} ${notes}`);
+
+  return accounts.find((account) => {
+    const normalizedIban = normalizeAccountNumber(account.iban ?? "");
+    return normalizedIban && accountNumberHaystack.includes(normalizedIban);
+  })?.id ?? null;
 }
 
 function parseTransactionsDeterministically(
@@ -741,6 +785,7 @@ Important rules:
 - Skip only rows that are empty, totals, balances, summaries, or obvious non-transaction metadata
 - If the CSV has separate debit/credit columns, handle accordingly
 - If amount is negative, it's an expense (make amount positive). If positive, it's income.
+- If the row description, memo, beneficiary, or notes contain an IBAN/account number matching one of the other available accounts, classify it as type "transfer" and use that account id as transfer_account_id
 - Use type "transfer" only when the movement is clearly between the selected account and another known account or wallet
 - For incoming transfer rows on the selected account, set selected_account_role to "destination"
 - For outgoing transfer rows on the selected account, set selected_account_role to "source"
@@ -890,7 +935,7 @@ export async function POST(request: NextRequest) {
       .map((label) => `- ${label.name} (id: ${label.id})`)
       .join("\n");
     const accountList = (accounts ?? [])
-      .map((account) => `- ${account.name}${account.bank_name ? ` (${account.bank_name})` : ""} [${account.type}] (id: ${account.id})`)
+      .map((account) => `- ${account.name}${account.bank_name ? ` (${account.bank_name})` : ""}${account.iban ? ` IBAN ${account.iban}` : ""} [${account.type}] (id: ${account.id})`)
       .join("\n");
 
     const { header, dataRows } = parseCsvRows(csvContent);

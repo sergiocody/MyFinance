@@ -370,6 +370,7 @@ export default function AccountsPage() {
     name: "",
     type: "checking" as Account["type"],
     bank_name: "",
+    iban: "",
     initial_balance: "0",
     color: "#3b82f6",
     currency: "EUR",
@@ -425,6 +426,7 @@ export default function AccountsPage() {
       name: "",
       type: "checking",
       bank_name: "",
+      iban: "",
       initial_balance: "0",
       color: "#3b82f6",
       currency: "EUR",
@@ -441,6 +443,7 @@ export default function AccountsPage() {
       name: account.name,
       type: account.type,
       bank_name: account.bank_name ?? "",
+      iban: account.iban ?? "",
       initial_balance: String(account.initial_balance),
       color: account.color,
       currency: account.currency,
@@ -462,6 +465,7 @@ export default function AccountsPage() {
           name: form.name,
           type: form.type,
           bank_name: form.bank_name || null,
+          iban: form.iban.trim() || null,
           color: form.color,
           currency: form.currency,
           account_class: form.account_class,
@@ -473,6 +477,7 @@ export default function AccountsPage() {
         name: form.name,
         type: form.type,
         bank_name: form.bank_name || null,
+        iban: form.iban.trim() || null,
         initial_balance: form.account_mode === "manual" ? balance : 0,
         current_balance: form.account_mode === "manual" ? balance : 0,
         color: form.color,
@@ -733,6 +738,11 @@ export default function AccountsPage() {
                     {account.bank_name && `${account.bank_name} · `}
                     {ACCOUNT_TYPES.find((t) => t.value === account.type)?.label}
                   </p>
+                  {account.iban && (
+                    <p className="mt-0.5 max-w-[180px] truncate text-[11px] text-gray-400" title={account.iban}>
+                      IBAN {account.iban}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex gap-1">
@@ -970,6 +980,20 @@ export default function AccountsPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               placeholder="e.g., ING, BBVA"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">IBAN / Account number</label>
+            <input
+              type="text"
+              value={form.iban}
+              onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="e.g., ES8001287820840104072774"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Used to detect transfers automatically during CSV imports and bank sync.
+            </p>
           </div>
 
           {!editing && form.account_mode === "manual" && (

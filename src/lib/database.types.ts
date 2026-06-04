@@ -50,6 +50,7 @@ export type Database = {
           initial_balance: number;
           current_balance: number;
           bank_name: string | null;
+          iban: string | null;
           color: string;
           is_active: boolean;
           account_class: "standard" | "remunerated" | "investment";
@@ -67,6 +68,7 @@ export type Database = {
           initial_balance?: number;
           current_balance?: number;
           bank_name?: string | null;
+          iban?: string | null;
           color?: string;
           is_active?: boolean;
           account_class?: "standard" | "remunerated" | "investment";
@@ -84,6 +86,7 @@ export type Database = {
           initial_balance?: number;
           current_balance?: number;
           bank_name?: string | null;
+          iban?: string | null;
           color?: string;
           is_active?: boolean;
           account_class?: "standard" | "remunerated" | "investment";
