@@ -45,26 +45,38 @@ const TRANSACTION_TYPE_OPTIONS = [
     label: "Expense",
     hint: "Money out",
     icon: ArrowUpRight,
-    activeClassName: "border-rose-200 bg-rose-50 text-rose-700",
-    iconClassName: "bg-rose-100 text-rose-600",
+    accent: "danger",
   },
   {
     value: "income",
     label: "Income",
     hint: "Money in",
     icon: ArrowDownLeft,
-    activeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    iconClassName: "bg-emerald-100 text-emerald-600",
+    accent: "success",
   },
   {
     value: "transfer",
     label: "Transfer",
     hint: "Move funds",
     icon: ArrowRightLeft,
-    activeClassName: "border-sky-200 bg-sky-50 text-sky-700",
-    iconClassName: "bg-sky-100 text-sky-600",
+    accent: "info",
   },
 ] as const;
+
+const TYPE_ACCENT_CLASS: Record<(typeof TRANSACTION_TYPE_OPTIONS)[number]["accent"], string> = {
+  danger:
+    "border-[rgba(184,66,46,0.32)] bg-[rgba(184,66,46,0.08)] text-[var(--color-danger)]",
+  success:
+    "border-[rgba(63,107,78,0.32)] bg-[rgba(63,107,78,0.08)] text-[var(--color-success)]",
+  info:
+    "border-[rgba(58,79,102,0.32)] bg-[rgba(58,79,102,0.08)] text-[var(--color-info)]",
+};
+
+const TYPE_ICON_CLASS: Record<(typeof TRANSACTION_TYPE_OPTIONS)[number]["accent"], string> = {
+  danger: "bg-[rgba(184,66,46,0.12)] text-[var(--color-danger)]",
+  success: "bg-[rgba(63,107,78,0.12)] text-[var(--color-success)]",
+  info: "bg-[rgba(58,79,102,0.12)] text-[var(--color-info)]",
+};
 
 const FLOW_CONTENT: Record<
   TransactionFlowType,
@@ -177,6 +189,29 @@ function buildEmptyForm(accounts: Account[], type: TransactionFlowType) {
   };
 }
 
+function amountClass(
+  type: "income" | "expense" | "transfer",
+  filterAccount: string,
+  destinationId: string | null | undefined
+) {
+  if (type === "income") return "amount-pos";
+  if (type === "expense") return "amount-neg";
+  if (type === "transfer" && filterAccount && destinationId === filterAccount) return "amount-pos";
+  return "amount-transfer";
+}
+
+function amountSign(
+  type: "income" | "expense" | "transfer",
+  filterAccount: string,
+  destinationId: string | null | undefined
+) {
+  if (type === "income") return "+";
+  if (type === "expense") return "-";
+  if (type === "transfer" && filterAccount && destinationId === filterAccount) return "+";
+  if (type === "transfer") return "-";
+  return "";
+}
+
 export default function TransactionsPage() {
   type TransactionFilterType = "" | "income" | "expense" | "transfer";
   const router = useRouter();
@@ -201,17 +236,17 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Filters
   const [filterAccount, setFilterAccount] = useState(accountParam);
   const [filterCategory, setFilterCategory] = useState(categoryParam);
   const [filterType, setFilterType] = useState<TransactionFilterType>(typeParam);
   const [filterDateFrom, setFilterDateFrom] = useState(fromParam);
   const [filterDateTo, setFilterDateTo] = useState(toParam);
-  const [showFilters, setShowFilters] = useState(Boolean(accountParam || categoryParam || typeParam || fromParam || toParam));
+  const [showFilters, setShowFilters] = useState(
+    Boolean(accountParam || categoryParam || typeParam || fromParam || toParam)
+  );
   const [formError, setFormError] = useState("");
   const [loadError, setLoadError] = useState("");
 
-  // Form
   const [form, setForm] = useState({
     account_id: "",
     category_id: "",
@@ -364,8 +399,6 @@ export default function TransactionsPage() {
       return;
     }
 
-    // For synced transactions, only allow updating category, labels, notes,
-    // type, and account_id/transfer_to_account_id (to convert income→transfer)
     const isSyncedEdit = editing && editing.source === "sync";
 
     if (isSyncedEdit) {
@@ -375,9 +408,8 @@ export default function TransactionsPage() {
           category_id: form.category_id || null,
           notes: form.notes || null,
           type: form.type,
-          transfer_to_account_id: form.type === "transfer" ? (form.transfer_to_account_id || null) : null,
-          // Allow changing account_id when converting to a transfer
-          // (e.g. income on synced account → transfer from another account to this one)
+          transfer_to_account_id:
+            form.type === "transfer" ? form.transfer_to_account_id || null : null,
           ...(form.type === "transfer" ? { account_id: form.account_id } : {}),
         })
         .eq("id", editing.id);
@@ -387,7 +419,6 @@ export default function TransactionsPage() {
         return;
       }
 
-      // Update labels
       await supabase.from("transaction_labels").delete().eq("transaction_id", editing.id);
       if (form.label_ids.length > 0) {
         await supabase.from("transaction_labels").insert(
@@ -404,21 +435,21 @@ export default function TransactionsPage() {
     }
 
     const payload = {
-        account_id: form.account_id,
-        category_id: form.category_id || null,
+      account_id: form.account_id,
+      category_id: form.category_id || null,
+      type: form.type,
+      amount,
+      description: form.description || null,
+      notes: form.notes || null,
+      date: form.date,
+      transaction_hash: createTransactionHash({
+        date: form.date,
         type: form.type,
         amount,
-        description: form.description || null,
-        notes: form.notes || null,
-        date: form.date,
-        transaction_hash: createTransactionHash({
-          date: form.date,
-          type: form.type,
-          amount,
-          description: form.description,
-        }),
-        transfer_to_account_id: form.type === "transfer" ? (form.transfer_to_account_id || null) : null,
-      };
+        description: form.description,
+      }),
+      transfer_to_account_id: form.type === "transfer" ? form.transfer_to_account_id || null : null,
+    };
 
     const transactionResponse = editing
       ? await supabase
@@ -427,11 +458,7 @@ export default function TransactionsPage() {
           .eq("id", editing.id)
           .select()
           .single()
-      : await supabase
-          .from("transactions")
-          .insert(payload)
-          .select()
-          .single();
+      : await supabase.from("transactions").insert(payload).select().single();
 
     if (transactionResponse.error) {
       setFormError(
@@ -477,13 +504,11 @@ export default function TransactionsPage() {
   const [categorizing, setCategorizing] = useState(false);
 
   async function handleAutoCategorize() {
-    const uncategorized = transactions.filter(tx => !tx.category_id && tx.description);
+    const uncategorized = transactions.filter((tx) => !tx.category_id && tx.description);
     if (uncategorized.length === 0) return;
 
     setCategorizing(true);
-    let updated = 0;
 
-    // Get all categorized transactions to build a description→category map
     const { data: categorized } = await supabase
       .from("transactions")
       .select("description, category_id")
@@ -495,7 +520,6 @@ export default function TransactionsPage() {
       return;
     }
 
-    // Build map: normalized description → category_id (most common)
     const descCatMap = new Map<string, Map<string, number>>();
     for (const row of categorized) {
       const key = (row.description ?? "").trim().toLowerCase();
@@ -505,24 +529,24 @@ export default function TransactionsPage() {
       catCounts.set(row.category_id!, (catCounts.get(row.category_id!) ?? 0) + 1);
     }
 
-    // Resolve best category per description
     const bestCat = new Map<string, string>();
     for (const [desc, catCounts] of descCatMap) {
       let best = "";
       let bestCount = 0;
       for (const [catId, count] of catCounts) {
-        if (count > bestCount) { best = catId; bestCount = count; }
+        if (count > bestCount) {
+          best = catId;
+          bestCount = count;
+        }
       }
       if (best) bestCat.set(desc, best);
     }
 
-    // Match uncategorized transactions
     for (const tx of uncategorized) {
       const key = (tx.description ?? "").trim().toLowerCase();
       const matchedCat = bestCat.get(key);
       if (matchedCat) {
         await supabase.from("transactions").update({ category_id: matchedCat }).eq("id", tx.id);
-        updated++;
       }
     }
 
@@ -545,18 +569,7 @@ export default function TransactionsPage() {
   const selectedDestinationAccount = accounts.find(
     (account) => account.id === form.transfer_to_account_id
   );
-  const fieldClassName =
-    "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
-  const sectionClassName = "rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5";
   const currentFlow = FLOW_CONTENT[form.type];
-  const actionIconButtonClass =
-    "rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600";
-  const mobileActionButtonClass =
-    "inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900";
-  const filterChipButtonClass =
-    "inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-sm font-medium transition";
-  const mobilePickerButtonClass =
-    "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition hover:border-slate-300 hover:bg-slate-50";
   const activeFilterCount = [
     filterAccount,
     filterCategory,
@@ -565,8 +578,12 @@ export default function TransactionsPage() {
     filterDateTo,
   ].filter(Boolean).length;
   const activeFilterSummary = [
-    filterAccount ? `Account: ${accounts.find((account) => account.id === filterAccount)?.name ?? "Selected"}` : null,
-    filterCategory ? `Category: ${categories.find((category) => category.id === filterCategory)?.name ?? "Selected"}` : null,
+    filterAccount
+      ? `Account: ${accounts.find((account) => account.id === filterAccount)?.name ?? "Selected"}`
+      : null,
+    filterCategory
+      ? `Category: ${categories.find((category) => category.id === filterCategory)?.name ?? "Selected"}`
+      : null,
     filterType ? `Type: ${filterType}` : null,
     filterDateFrom ? `From ${formatDate(filterDateFrom)}` : null,
     filterDateTo ? `To ${formatDate(filterDateTo)}` : null,
@@ -603,23 +620,23 @@ export default function TransactionsPage() {
         : currentFlow.submitLabel;
 
   return (
-    <div className="space-y-6 pt-12 lg:pt-0">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Browse the ledger, then refine it with quick mobile-friendly filters.
+            <p className="font-label text-[11px] text-[var(--color-secondary)]">Ledger</p>
+            <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+              Transactions
+            </h1>
+            <p className="mt-1 text-sm text-[var(--color-secondary)]">
+              Browse the ledger, then refine it with quick filters.
             </p>
           </div>
 
           {!showFilters && activeFilterSummary.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {activeFilterSummary.map((item) => (
-                <span
-                  key={item}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
-                >
+                <span key={item} className="chip">
                   {item}
                 </span>
               ))}
@@ -628,30 +645,32 @@ export default function TransactionsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
+          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary">
             <Filter size={16} />
             Filters
             {activeFilterCount > 0 && (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-neutral)]">
                 {activeFilterCount}
               </span>
             )}
           </button>
           <button
             onClick={handleAutoCategorize}
-            disabled={categorizing || transactions.filter(tx => !tx.category_id).length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+            disabled={
+              categorizing || transactions.filter((tx) => !tx.category_id).length === 0
+            }
+            className="btn btn-secondary"
           >
             <Tags size={16} className={categorizing ? "animate-pulse" : ""} />
             Auto-cat
           </button>
           <button
             onClick={() => openCreate("expense")}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-            hidden={Boolean(filterAccount && accounts.find((a) => a.id === filterAccount)?.account_mode === "automated")}
+            className="btn btn-primary col-span-2 sm:col-span-1"
+            hidden={Boolean(
+              filterAccount &&
+                accounts.find((a) => a.id === filterAccount)?.account_mode === "automated"
+            )}
           >
             <Plus size={16} />
             New expense
@@ -659,23 +678,19 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       {showFilters && (
         <Card className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="font-label text-[11px] text-slate-500">Refine List</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">Filters</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="font-label text-[11px] text-[var(--color-secondary)]">Refine List</p>
+              <h2 className="mt-2 text-xl font-semibold text-[var(--color-primary)]">Filters</h2>
+              <p className="mt-1 text-sm text-[var(--color-secondary)]">
                 Results update instantly as you narrow down the list.
               </p>
             </div>
 
             {activeFilterCount > 0 && (
-              <button
-                onClick={resetFilters}
-                className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-              >
+              <button onClick={resetFilters} className="btn btn-secondary self-start">
                 <RotateCcw size={14} />
                 Reset
               </button>
@@ -683,11 +698,10 @@ export default function TransactionsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="font-label block text-[11px] text-slate-500">Type</label>
+            <label className="font-label block text-[11px] text-[var(--color-secondary)]">Type</label>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {FILTER_TYPE_OPTIONS.map((option) => {
                 const isActive = filterType === option.value;
-
                 return (
                   <button
                     key={option.label}
@@ -696,10 +710,10 @@ export default function TransactionsPage() {
                       setFilterType(option.value as TransactionFilterType);
                       setPage(0);
                     }}
-                    className={`${filterChipButtonClass} ${
+                    className={`rounded-md border px-3 py-2 text-sm font-medium transition ${
                       isActive
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-neutral)]"
+                        : "border-[var(--color-border)] bg-white text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)] hover:text-[var(--color-primary)]"
                     }`}
                   >
                     {option.label}
@@ -711,45 +725,59 @@ export default function TransactionsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-slate-500">Account</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Account
+              </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("account")}
-                className={`${mobilePickerButtonClass} sm:hidden`}
+                className="field flex w-full items-center justify-between text-left sm:hidden"
               >
                 <span>{selectedFilterAccountName}</span>
-                <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Choose</span>
+                <span className="font-label text-[10px] text-[var(--color-secondary)]">Choose</span>
               </button>
               <select
                 value={filterAccount}
-                onChange={(e) => { setFilterAccount(e.target.value); setPage(0); }}
-                className={`${fieldClassName} hidden sm:block`}
+                onChange={(e) => {
+                  setFilterAccount(e.target.value);
+                  setPage(0);
+                }}
+                className="field hidden sm:block"
               >
                 <option value="">All accounts</option>
                 {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>{account.name}</option>
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="font-label mb-2 block text-[11px] text-slate-500">Category</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Category
+              </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("category")}
-                className={`${mobilePickerButtonClass} sm:hidden`}
+                className="field flex w-full items-center justify-between text-left sm:hidden"
               >
                 <span>{selectedFilterCategoryName}</span>
-                <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">Choose</span>
+                <span className="font-label text-[10px] text-[var(--color-secondary)]">Choose</span>
               </button>
               <select
                 value={filterCategory}
-                onChange={(e) => { setFilterCategory(e.target.value); setPage(0); }}
-                className={`${fieldClassName} hidden sm:block`}
+                onChange={(e) => {
+                  setFilterCategory(e.target.value);
+                  setPage(0);
+                }}
+                className="field hidden sm:block"
               >
                 <option value="">All categories</option>
                 {categories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -757,71 +785,83 @@ export default function TransactionsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-slate-500">From</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                From
+              </label>
               <input
                 type="date"
                 value={filterDateFrom}
-                onChange={(e) => { setFilterDateFrom(e.target.value); setPage(0); }}
-                className={fieldClassName}
+                onChange={(e) => {
+                  setFilterDateFrom(e.target.value);
+                  setPage(0);
+                }}
+                className="field"
               />
             </div>
 
             <div>
-              <label className="font-label mb-2 block text-[11px] text-slate-500">To</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                To
+              </label>
               <input
                 type="date"
                 value={filterDateTo}
-                onChange={(e) => { setFilterDateTo(e.target.value); setPage(0); }}
-                className={fieldClassName}
+                onChange={(e) => {
+                  setFilterDateTo(e.target.value);
+                  setPage(0);
+                }}
+                className="field"
               />
             </div>
           </div>
         </Card>
       )}
 
-      {/* Transactions Table */}
       <Card className="overflow-x-auto p-0!">
         {loadError && (
-          <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="border-b border-[var(--color-border)] bg-[rgba(184,66,46,0.06)] px-4 py-3 text-sm text-[var(--color-danger)]">
             Failed to load transactions: {loadError}
           </div>
         )}
+
+        {/* Mobile: card list */}
         <div className="md:hidden">
           {loading ? (
-            <div className="px-4 py-8 text-center text-gray-400">Loading...</div>
+            <div className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">Loading...</div>
           ) : transactions.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-400">No transactions found</div>
+            <div className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
+              No transactions found
+            </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--color-border)]">
               {transactions.map((tx) => (
-                <div key={tx.id} className="space-y-4 px-4 py-4">
+                <div key={tx.id} className="space-y-3 px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate" title={tx.description || "Untitled transaction"}>
+                      <p
+                        className="truncate text-sm font-semibold text-[var(--color-primary)]"
+                        title={tx.description || "Untitled transaction"}
+                      >
                         {tx.description || "Untitled transaction"}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">{formatDate(tx.date)}</p>
+                      <p className="mt-1 text-xs text-[var(--color-secondary)]">{formatDate(tx.date)}</p>
                     </div>
                     <span
-                      className={`shrink-0 text-sm font-semibold ${
-                        tx.type === "income"
-                          ? "text-green-600"
-                          : tx.type === "expense"
-                            ? "text-red-600"
-                            : tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount
-                              ? "text-green-600"
-                              : "text-blue-600"
-                      }`}
+                      className={`shrink-0 text-sm font-semibold ${amountClass(
+                        tx.type,
+                        filterAccount,
+                        tx.transfer_to_account_id
+                      )}`}
                     >
-                      {tx.type === "income" || (tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount) ? "+" : tx.type === "expense" ? "-" : tx.type === "transfer" ? "-" : ""}
+                      {amountSign(tx.type, filterAccount, tx.transfer_to_account_id)}
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </div>
 
-                  <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                  <div className="grid gap-3 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] p-3">
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Account</span>
-                      <div className="flex items-center gap-2 text-gray-600">
+                      <span className="font-label text-[10px] text-[var(--color-secondary)]">Account</span>
+                      <div className="flex items-center gap-2 text-[var(--color-secondary)]">
                         <div
                           className="h-2 w-2 rounded-full"
                           style={{ backgroundColor: tx.accounts?.color }}
@@ -832,8 +872,10 @@ export default function TransactionsPage() {
 
                     {tx.destination_account && (
                       <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Destination</span>
-                        <div className="flex items-center gap-2 text-gray-600">
+                        <span className="font-label text-[10px] text-[var(--color-secondary)]">
+                          Destination
+                        </span>
+                        <div className="flex items-center gap-2 text-[var(--color-secondary)]">
                           <div
                             className="h-2 w-2 rounded-full"
                             style={{ backgroundColor: tx.destination_account.color }}
@@ -844,45 +886,54 @@ export default function TransactionsPage() {
                     )}
 
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-medium uppercase tracking-[0.14em] text-gray-400">Category</span>
+                      <span className="font-label text-[10px] text-[var(--color-secondary)]">Category</span>
                       <select
                         value={tx.category_id ?? ""}
                         onChange={async (e) => {
                           const newCatId = e.target.value || null;
-                          await supabase.from("transactions").update({ category_id: newCatId }).eq("id", tx.id);
+                          await supabase
+                            .from("transactions")
+                            .update({ category_id: newCatId })
+                            .eq("id", tx.id);
                           loadTransactions();
                         }}
-                        className="rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-                        style={tx.categories ? {
-                          backgroundColor: tx.categories.color + "20",
-                          color: tx.categories.color,
-                        } : undefined}
+                        className="cursor-pointer rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)] focus:outline-none focus:ring-1 focus:ring-[var(--color-tertiary)]"
+                        style={
+                          tx.categories
+                            ? {
+                                backgroundColor: tx.categories.color + "20",
+                                color: tx.categories.color,
+                              }
+                            : undefined
+                        }
                       >
                         <option value="">—</option>
                         {categories
-                          .filter(c => c.type === tx.type || tx.type === "transfer")
-                          .map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                          .filter((c) => c.type === tx.type || tx.type === "transfer")
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
                           ))}
                       </select>
                     </div>
 
                     {tx.transaction_labels && tx.transaction_labels.length > 0 && (
                       <div className="space-y-2">
-                        <span className="block text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
+                        <span className="font-label block text-[10px] text-[var(--color-secondary)]">
                           Labels
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {tx.transaction_labels.map((transactionLabel) => (
+                          {tx.transaction_labels.map((tl) => (
                             <span
-                              key={transactionLabel.labels.id}
+                              key={tl.labels.id}
                               className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                               style={{
-                                backgroundColor: transactionLabel.labels.color + "20",
-                                color: transactionLabel.labels.color,
+                                backgroundColor: tl.labels.color + "20",
+                                color: tl.labels.color,
                               }}
                             >
-                              {transactionLabel.labels.name}
+                              {tl.labels.name}
                             </span>
                           ))}
                         </div>
@@ -891,33 +942,27 @@ export default function TransactionsPage() {
 
                     {tx.notes && (
                       <div className="space-y-1">
-                        <span className="block text-xs font-medium uppercase tracking-[0.14em] text-gray-400">
+                        <span className="font-label block text-[10px] text-[var(--color-secondary)]">
                           Notes
                         </span>
-                        <p className="text-xs text-gray-500">{tx.notes}</p>
+                        <p className="text-xs text-[var(--color-secondary)]">{tx.notes}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
                     {tx.source !== "sync" && (
-                      <button
-                        onClick={() => openDuplicate(tx)}
-                        className={mobileActionButtonClass}
-                      >
+                      <button onClick={() => openDuplicate(tx)} className="btn btn-secondary text-xs">
                         Copy
                       </button>
                     )}
-                    <button
-                      onClick={() => openEdit(tx)}
-                      className={mobileActionButtonClass}
-                    >
+                    <button onClick={() => openEdit(tx)} className="btn btn-secondary text-xs">
                       {tx.source === "sync" ? "Categorize" : "Edit"}
                     </button>
                     {tx.source !== "sync" && (
                       <button
                         onClick={() => handleDelete(tx.id)}
-                        className="inline-flex items-center justify-center rounded-xl border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                        className="btn btn-danger-outline text-xs"
                       >
                         Delete
                       </button>
@@ -929,42 +974,50 @@ export default function TransactionsPage() {
           )}
         </div>
 
+        {/* Desktop: table */}
         <table className="hidden w-full text-sm md:table">
           <thead>
-            <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase text-gray-500">
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Account</th>
-              <th className="px-4 py-3">Destination</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Labels</th>
-              <th className="px-4 py-3 text-right">Amount</th>
+            <tr className="border-b border-[var(--color-border)] text-left">
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Date</th>
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Description</th>
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Account</th>
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Destination</th>
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Category</th>
+              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Labels</th>
+              <th className="font-label px-4 py-3 text-right text-[11px] text-[var(--color-secondary)]">Amount</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[var(--color-border)]">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
                   Loading...
                 </td>
               </tr>
             ) : transactions.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
                   No transactions found
                 </td>
               </tr>
             ) : (
               transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                <tr key={tx.id} className="hover:bg-[rgba(26,28,30,0.03)]">
+                  <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
                     {formatDate(tx.date)}
                   </td>
-                  <td className="px-4 py-3 max-w-[180px] sm:max-w-[240px] md:max-w-[320px]">
-                    <p className="font-medium text-gray-900 truncate" title={tx.description || "—"}>{tx.description || "—"}</p>
+                  <td className="max-w-[180px] px-4 py-3 sm:max-w-[240px] md:max-w-[320px]">
+                    <p
+                      className="truncate font-medium text-[var(--color-primary)]"
+                      title={tx.description || "—"}
+                    >
+                      {tx.description || "—"}
+                    </p>
                     {tx.notes && (
-                      <p className="text-xs text-gray-400 truncate" title={tx.notes}>{tx.notes}</p>
+                      <p className="truncate text-xs text-[var(--color-secondary)]" title={tx.notes}>
+                        {tx.notes}
+                      </p>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -973,7 +1026,7 @@ export default function TransactionsPage() {
                         className="h-2 w-2 rounded-full"
                         style={{ backgroundColor: tx.accounts?.color }}
                       />
-                      <span className="text-gray-600">{tx.accounts?.name}</span>
+                      <span className="text-[var(--color-secondary)]">{tx.accounts?.name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -983,10 +1036,12 @@ export default function TransactionsPage() {
                           className="h-2 w-2 rounded-full"
                           style={{ backgroundColor: tx.destination_account.color }}
                         />
-                        <span className="text-gray-600">{tx.destination_account.name}</span>
+                        <span className="text-[var(--color-secondary)]">
+                          {tx.destination_account.name}
+                        </span>
                       </div>
                     ) : (
-                      <span className="text-gray-300">—</span>
+                      <span className="text-[var(--color-secondary)]">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -994,20 +1049,29 @@ export default function TransactionsPage() {
                       value={tx.category_id ?? ""}
                       onChange={async (e) => {
                         const newCatId = e.target.value || null;
-                        await supabase.from("transactions").update({ category_id: newCatId }).eq("id", tx.id);
+                        await supabase
+                          .from("transactions")
+                          .update({ category_id: newCatId })
+                          .eq("id", tx.id);
                         loadTransactions();
                       }}
-                      className="rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-                      style={tx.categories ? {
-                        backgroundColor: tx.categories.color + "20",
-                        color: tx.categories.color,
-                      } : undefined}
+                      className="cursor-pointer rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)] focus:outline-none focus:ring-1 focus:ring-[var(--color-tertiary)]"
+                      style={
+                        tx.categories
+                          ? {
+                              backgroundColor: tx.categories.color + "20",
+                              color: tx.categories.color,
+                            }
+                          : undefined
+                      }
                     >
                       <option value="">—</option>
                       {categories
-                        .filter(c => c.type === tx.type || tx.type === "transfer")
-                        .map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                        .filter((c) => c.type === tx.type || tx.type === "transfer")
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
                         ))}
                     </select>
                   </td>
@@ -1029,17 +1093,9 @@ export default function TransactionsPage() {
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                     <span
-                      className={
-                        tx.type === "income"
-                          ? "text-green-600"
-                          : tx.type === "expense"
-                          ? "text-red-600"
-                          : tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount
-                          ? "text-green-600"
-                          : "text-blue-600"
-                      }
+                      className={amountClass(tx.type, filterAccount, tx.transfer_to_account_id)}
                     >
-                      {tx.type === "income" || (tx.type === "transfer" && filterAccount && tx.transfer_to_account_id === filterAccount) ? "+" : tx.type === "expense" || tx.type === "transfer" ? "-" : ""}
+                      {amountSign(tx.type, filterAccount, tx.transfer_to_account_id)}
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </td>
@@ -1048,24 +1104,25 @@ export default function TransactionsPage() {
                       {tx.source !== "sync" && (
                         <button
                           onClick={() => openDuplicate(tx)}
-                          className={actionIconButtonClass}
                           aria-label="Copy transaction"
                           title="Copy transaction"
+                          className="btn btn-ghost px-2 py-1.5"
                         >
                           <Copy size={14} />
                         </button>
                       )}
                       <button
                         onClick={() => openEdit(tx)}
-                        className={actionIconButtonClass}
                         title={tx.source === "sync" ? "Categorize" : "Edit"}
+                        className="btn btn-ghost px-2 py-1.5"
                       >
                         <Pencil size={14} />
                       </button>
                       {tx.source !== "sync" && (
                         <button
                           onClick={() => handleDelete(tx.id)}
-                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label="Delete transaction"
+                          className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1078,24 +1135,26 @@ export default function TransactionsPage() {
           </tbody>
         </table>
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
-            <p className="text-xs text-gray-500">
-              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount}
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] px-4 py-3">
+            <p className="text-xs text-[var(--color-secondary)]">
+              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of{" "}
+              {totalCount}
             </p>
             <div className="flex gap-2">
               <button
                 disabled={page === 0}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                aria-label="Previous page"
+                className="btn btn-secondary px-2 py-1.5"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                aria-label="Next page"
+                className="btn btn-secondary px-2 py-1.5"
               >
                 <ChevronRight size={16} />
               </button>
@@ -1104,7 +1163,7 @@ export default function TransactionsPage() {
         )}
       </Card>
 
-      {/* Create/Edit Modal */}
+      {/* Composer modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -1113,22 +1172,20 @@ export default function TransactionsPage() {
         mobileSheet
         bodyClassName="p-0"
       >
-        <form onSubmit={handleSave} className="flex h-full flex-col bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_18%,#f8fafc_100%)]">
+        <form onSubmit={handleSave} className="flex h-full flex-col bg-[var(--color-neutral)]">
           <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-6">
-            <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(129,140,248,0.16),transparent_34%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-sm sm:p-5">
+            <section className="surface-card overflow-hidden rounded-md p-4 sm:p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="font-label text-[11px] text-[var(--color-secondary)]">
                     {currentFlow.eyebrow}
                   </p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
                     {composerHeading}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {composerSubtitle}
-                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-secondary)]">{composerSubtitle}</p>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm">
+                <div className="chip">
                   <CalendarDays className="h-3.5 w-3.5" />
                   {formatDate(form.date)}
                 </div>
@@ -1137,7 +1194,7 @@ export default function TransactionsPage() {
               <div className="mt-5 grid grid-cols-3 gap-2">
                 {TRANSACTION_TYPE_OPTIONS.map((option) => {
                   const Icon = option.icon;
-
+                  const isActive = form.type === option.value;
                   return (
                     <button
                       key={option.value}
@@ -1152,27 +1209,30 @@ export default function TransactionsPage() {
                           ...form,
                           type: option.value,
                           category_id: "",
-                          // When converting synced income → transfer, pre-fill the
-                          // synced account as destination and clear the source so the
-                          // user picks the origin account.
                           account_id: isSyncedIncomeToTransfer ? "" : form.account_id,
                           transfer_to_account_id:
                             option.value === "transfer"
-                              ? (isSyncedIncomeToTransfer ? editing.account_id : form.transfer_to_account_id)
+                              ? isSyncedIncomeToTransfer
+                                ? editing.account_id
+                                : form.transfer_to_account_id
                               : "",
                         });
                       }}
-                      className={`rounded-2xl border px-3 py-3 text-left transition ${
-                        form.type === option.value
-                          ? option.activeClassName
-                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                      className={`rounded-md border px-3 py-3 text-left transition ${
+                        isActive
+                          ? TYPE_ACCENT_CLASS[option.accent]
+                          : "border-[var(--color-border)] bg-white text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
                       }`}
                     >
-                      <span className={`mb-3 inline-flex rounded-2xl p-2 ${option.iconClassName}`}>
+                      <span
+                        className={`mb-3 inline-flex rounded-full p-2 ${
+                          isActive ? TYPE_ICON_CLASS[option.accent] : "bg-[rgba(26,28,30,0.06)] text-[var(--color-secondary)]"
+                        }`}
+                      >
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="block text-sm font-semibold">{option.label}</span>
-                      <span className="mt-1 block text-[11px] text-current/75">{option.hint}</span>
+                      <span className="mt-1 block text-[11px] text-current/80">{option.hint}</span>
                     </button>
                   );
                 })}
@@ -1182,9 +1242,9 @@ export default function TransactionsPage() {
                 {currentFlow.steps.map((step, index) => (
                   <span
                     key={`${currentFlow.eyebrow}-${step}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500"
+                    className="font-label inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-[10px] text-[var(--color-secondary)]"
                   >
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] text-[var(--color-neutral)]">
                       {index + 1}
                     </span>
                     {step}
@@ -1194,24 +1254,24 @@ export default function TransactionsPage() {
 
               <div className="mt-5 grid gap-4">
                 <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                     {currentFlow.descriptionLabel}
                   </label>
                   <input
                     type="text"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className={`${fieldClassName} text-base`}
+                    className="field text-base"
                     placeholder={currentFlow.descriptionPlaceholder}
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                   <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                       {currentFlow.amountLabel}
                     </label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-slate-400">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-[var(--color-secondary)]">
                         €
                       </span>
                       <input
@@ -1222,13 +1282,13 @@ export default function TransactionsPage() {
                         required
                         value={form.amount}
                         onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                        className={`${fieldClassName} pl-9 text-3xl font-semibold tracking-tight`}
+                        className="field pl-9 text-3xl font-semibold tracking-tight"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                       Date
                     </label>
                     <input
@@ -1236,21 +1296,23 @@ export default function TransactionsPage() {
                       required
                       value={form.date}
                       onChange={(e) => setForm({ ...form, date: e.target.value })}
-                      className={fieldClassName}
+                      className="field"
                     />
                   </div>
                 </div>
               </div>
             </section>
 
-            <section className={sectionClassName}>
+            <section className="surface-card rounded-md p-4 sm:p-5">
               <div className="mb-4 flex items-start gap-3">
-                <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-600">
+                <div className="rounded-md bg-[rgba(26,28,30,0.06)] p-2.5 text-[var(--color-secondary)]">
                   <Landmark className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">{currentFlow.accountSectionTitle}</h3>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h3 className="text-base font-semibold text-[var(--color-primary)]">
+                    {currentFlow.accountSectionTitle}
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--color-secondary)]">
                     {currentFlow.accountSectionDescription}
                   </p>
                 </div>
@@ -1258,7 +1320,7 @@ export default function TransactionsPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                     {currentFlow.accountLabel}
                   </label>
                   <select
@@ -1269,10 +1331,12 @@ export default function TransactionsPage() {
                         ...form,
                         account_id: e.target.value,
                         transfer_to_account_id:
-                          e.target.value === form.transfer_to_account_id ? "" : form.transfer_to_account_id,
+                          e.target.value === form.transfer_to_account_id
+                            ? ""
+                            : form.transfer_to_account_id,
                       })
                     }
-                    className={fieldClassName}
+                    className="field"
                   >
                     <option value="">Select account</option>
                     {accounts.map((account) => (
@@ -1282,7 +1346,7 @@ export default function TransactionsPage() {
                     ))}
                   </select>
                   {selectedAccount && (
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="mt-2 text-xs text-[var(--color-secondary)]">
                       {currentFlow.accountHint} Current selection: {selectedAccount.name}
                     </p>
                   )}
@@ -1290,13 +1354,15 @@ export default function TransactionsPage() {
 
                 {form.type === "transfer" ? (
                   <div>
-                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                       {currentFlow.destinationLabel}
                     </label>
                     <select
                       value={form.transfer_to_account_id}
-                      onChange={(e) => setForm({ ...form, transfer_to_account_id: e.target.value })}
-                      className={fieldClassName}
+                      onChange={(e) =>
+                        setForm({ ...form, transfer_to_account_id: e.target.value })
+                      }
+                      className="field"
                     >
                       <option value="">Select destination</option>
                       {accounts
@@ -1308,45 +1374,48 @@ export default function TransactionsPage() {
                         ))}
                     </select>
                     {selectedDestinationAccount && (
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-xs text-[var(--color-secondary)]">
                         Funds move to {selectedDestinationAccount.name}
                       </p>
                     )}
                     {selectedDestinationAccount?.account_mode === "automated" && (
-                      <p className="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                        ⚠️ This account is synced with a bank. The transfer may also be imported automatically during sync, which could cause a duplicate.
+                      <p className="notice notice-warning mt-1 text-xs">
+                        ⚠️ This account is synced with a bank. The transfer may also be imported
+                        automatically during sync, which could cause a duplicate.
                       </p>
                     )}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  <div className="rounded-md border border-dashed border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] px-4 py-3 text-sm text-[var(--color-secondary)]">
                     {currentFlow.accountHint}
                   </div>
                 )}
               </div>
             </section>
 
-            <section className={`${sectionClassName} space-y-4`}>
+            <section className="surface-card space-y-4 rounded-md p-4 sm:p-5">
               <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-600">
+                <div className="rounded-md bg-[rgba(26,28,30,0.06)] p-2.5 text-[var(--color-secondary)]">
                   <Tags className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">{currentFlow.categorySectionTitle}</h3>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h3 className="text-base font-semibold text-[var(--color-primary)]">
+                    {currentFlow.categorySectionTitle}
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--color-secondary)]">
                     {currentFlow.categorySectionDescription}
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                   {currentFlow.categoryLabel}
                 </label>
                 <select
                   value={form.category_id}
                   onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                  className={fieldClassName}
+                  className="field"
                 >
                   <option value="">None</option>
                   {filteredCategories.map((category) => (
@@ -1358,7 +1427,7 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                   {currentFlow.labelsLabel}
                 </label>
                 <LabelMultiSelect
@@ -1369,39 +1438,32 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  <span>{currentFlow.notesLabel}</span>
+                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                  {currentFlow.notesLabel}
                 </label>
                 <textarea
                   rows={3}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  className={`${fieldClassName} resize-none`}
+                  className="field resize-none"
                   placeholder={currentFlow.notesPlaceholder}
                 />
               </div>
             </section>
 
-            {formError && (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {formError}
-              </div>
-            )}
+            {formError && <div className="notice notice-danger">{formError}</div>}
           </div>
 
-          <div className="border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+          <div className="border-t border-[var(--color-border)] bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
+              <button type="submit" className="btn btn-primary">
                 {composerSubmitLabel}
               </button>
             </div>
@@ -1426,10 +1488,10 @@ export default function TransactionsPage() {
                   setPage(0);
                   setMobileFilterPicker(null);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
               >
                 <span>All accounts</span>
-                {filterAccount === "" && <Check className="h-4 w-4 text-slate-900" />}
+                {filterAccount === "" && <Check className="h-4 w-4 text-[var(--color-tertiary)]" />}
               </button>
               {accounts.map((account) => (
                 <button
@@ -1440,10 +1502,12 @@ export default function TransactionsPage() {
                     setPage(0);
                     setMobileFilterPicker(null);
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                  className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
                 >
                   <span>{account.name}</span>
-                  {filterAccount === account.id && <Check className="h-4 w-4 text-slate-900" />}
+                  {filterAccount === account.id && (
+                    <Check className="h-4 w-4 text-[var(--color-tertiary)]" />
+                  )}
                 </button>
               ))}
             </>
@@ -1458,10 +1522,10 @@ export default function TransactionsPage() {
                   setPage(0);
                   setMobileFilterPicker(null);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
               >
                 <span>All categories</span>
-                {filterCategory === "" && <Check className="h-4 w-4 text-slate-900" />}
+                {filterCategory === "" && <Check className="h-4 w-4 text-[var(--color-tertiary)]" />}
               </button>
               {categories.map((category) => (
                 <button
@@ -1472,10 +1536,12 @@ export default function TransactionsPage() {
                     setPage(0);
                     setMobileFilterPicker(null);
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                  className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
                 >
                   <span>{category.name}</span>
-                  {filterCategory === category.id && <Check className="h-4 w-4 text-slate-900" />}
+                  {filterCategory === category.id && (
+                    <Check className="h-4 w-4 text-[var(--color-tertiary)]" />
+                  )}
                 </button>
               ))}
             </>

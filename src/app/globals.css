@@ -1,19 +1,26 @@
 @import "tailwindcss";
 
- :root {
+:root {
   --color-primary: #1a1c1e;
   --color-secondary: #6c7278;
   --color-tertiary: #b8422e;
   --color-neutral: #f7f5f2;
+  --color-success: #3f6b4e;
+  --color-danger: #b8422e;
+  --color-warning: #a86e2a;
+  --color-info: #3a4f66;
   --color-surface: rgba(255, 255, 255, 0.76);
   --color-surface-strong: rgba(255, 255, 255, 0.9);
   --color-border: rgba(108, 114, 120, 0.18);
+  --color-border-strong: rgba(108, 114, 120, 0.32);
   --shadow-matte: 0 1px 0 rgba(255, 255, 255, 0.72), 0 18px 48px rgba(26, 28, 30, 0.07);
- }
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
 
- html {
+html {
   background: var(--color-neutral);
- }
+}
 
 body {
   min-height: 100vh;
@@ -23,55 +30,223 @@ body {
     radial-gradient(circle at bottom right, rgba(26, 28, 30, 0.05), transparent 28%),
     var(--color-neutral);
   color: var(--color-primary);
- }
+}
 
- ::selection {
+::selection {
   background: rgba(184, 66, 46, 0.18);
- }
+}
 
- h1,
- h2,
- h3,
- h4,
- h5,
- h6 {
+h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.03em;
- }
+}
 
- .font-label {
+.font-label {
   font-family: var(--font-space-grotesk), Arial, Helvetica, sans-serif;
   letter-spacing: 0.14em;
   text-transform: uppercase;
- }
+}
 
- .surface-card {
+/* --- Surfaces ----------------------------------------------------------- */
+
+.surface-card {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   box-shadow: var(--shadow-matte);
   backdrop-filter: blur(10px);
- }
+}
 
- .surface-card-strong {
+.surface-card-strong {
   border: 1px solid var(--color-border);
   background: var(--color-surface-strong);
   box-shadow: var(--shadow-matte);
   backdrop-filter: blur(10px);
- }
+}
 
- .accent-button {
+/* --- Buttons ------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
   background: var(--color-tertiary);
   color: var(--color-neutral);
- }
+}
+.btn-primary:hover:not(:disabled) { background: #a23a28; }
 
- .accent-button:hover {
-  background: #a23a28;
- }
-
- .ink-button {
+.btn-ink {
   background: var(--color-primary);
   color: var(--color-neutral);
- }
+}
+.btn-ink:hover:not(:disabled) { background: #111315; }
 
- .ink-button:hover {
-  background: #111315;
+.btn-secondary {
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-primary);
+}
+.btn-secondary:hover:not(:disabled) { background: rgba(26, 28, 30, 0.04); }
+
+.btn-ghost {
+  color: var(--color-secondary);
+  background: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-primary);
+  background: rgba(26, 28, 30, 0.05);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-neutral);
+}
+.btn-danger:hover:not(:disabled) { background: #a23a28; }
+
+.btn-danger-outline {
+  border: 1px solid rgba(184, 66, 46, 0.32);
+  color: var(--color-danger);
+  background: rgba(255, 255, 255, 0.82);
+}
+.btn-danger-outline:hover:not(:disabled) {
+  background: rgba(184, 66, 46, 0.08);
+}
+
+/* Backwards-compat aliases used by AuthScreen / Sidebar / dashboard hero. */
+.accent-button { background: var(--color-tertiary); color: var(--color-neutral); }
+.accent-button:hover:not(:disabled) { background: #a23a28; }
+.ink-button { background: var(--color-primary); color: var(--color-neutral); }
+.ink-button:hover:not(:disabled) { background: #111315; }
+
+/* --- Form fields -------------------------------------------------------- */
+
+.field {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.field::placeholder { color: var(--color-secondary); opacity: 0.7; }
+
+.field:focus {
+  border-color: var(--color-tertiary);
+  box-shadow: 0 0 0 3px rgba(184, 66, 46, 0.14);
+}
+
+.field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- Chips / badges ----------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgba(26, 28, 30, 0.06);
+  color: var(--color-secondary);
+}
+
+.chip-success { background: rgba(63, 107, 78, 0.12); color: var(--color-success); }
+.chip-danger  { background: rgba(184, 66, 46, 0.12); color: var(--color-danger); }
+.chip-warning { background: rgba(168, 110, 42, 0.14); color: var(--color-warning); }
+.chip-info    { background: rgba(58, 79, 102, 0.12); color: var(--color-info); }
+
+/* --- Status notices (inline alerts) ------------------------------------ */
+
+.notice {
+  border: 1px solid var(--color-border);
+  background: rgba(26, 28, 30, 0.04);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-primary);
+}
+
+.notice-danger {
+  border-color: rgba(184, 66, 46, 0.24);
+  background: rgba(184, 66, 46, 0.08);
+  color: var(--color-danger);
+}
+
+.notice-warning {
+  border-color: rgba(168, 110, 42, 0.28);
+  background: rgba(168, 110, 42, 0.10);
+  color: var(--color-warning);
+}
+
+.notice-success {
+  border-color: rgba(63, 107, 78, 0.24);
+  background: rgba(63, 107, 78, 0.08);
+  color: var(--color-success);
+}
+
+.notice-info {
+  border-color: rgba(58, 79, 102, 0.24);
+  background: rgba(58, 79, 102, 0.08);
+  color: var(--color-info);
+}
+
+/* --- Amount color semantics -------------------------------------------- */
+
+.amount-pos      { color: var(--color-success); }
+.amount-neg      { color: var(--color-danger); }
+.amount-transfer { color: var(--color-info); }
+
+/* --- Mobile app bar spacer (used by AppShell on <lg) ------------------- */
+
+.app-content {
+  padding-top: 0;
+}
+
+@media (max-width: 1023.98px) {
+  .app-content {
+    padding-top: 3.75rem; /* clears the fixed 60px top bar */
+  }
+}
+
+/* --- Public-pages prose ------------------------------------------------- */
+
+.prose-custom {
+  color: var(--color-secondary);
+}
+.prose-custom h1,
+.prose-custom h2,
+.prose-custom h3 {
+  color: var(--color-primary);
+}
+.prose-custom strong {
+  color: var(--color-primary);
+}
+.prose-custom ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-custom li + li {
+  margin-top: 0.25rem;
 }

@@ -85,64 +85,70 @@ export default function SelectBankAccountsPage() {
 
   if (bankAccounts.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center pt-12 lg:pt-0">
-        <p className="text-gray-500">No bank accounts found.</p>
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-[var(--color-secondary)]">No bank accounts found.</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 pt-12 lg:pt-0">
+    <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Select Bank Accounts</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {institution} gave access to {bankAccounts.length} accounts.
-          Select which ones you want to track:
+        <p className="font-label text-[11px] text-[var(--color-secondary)]">Linking</p>
+        <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+          Select Bank Accounts
+        </h1>
+        <p className="mt-1 text-sm text-[var(--color-secondary)]">
+          {institution} gave access to {bankAccounts.length} accounts. Select which ones you want
+          to track:
         </p>
       </div>
 
       <div className="space-y-3">
-        {bankAccounts.map((account) => (
-          <Card
-            key={account.uid}
-            onClick={() => toggleAccount(account.uid)}
-            className={`cursor-pointer transition ${
-              selected.has(account.uid)
-                ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200"
-                : "hover:border-gray-300"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {selected.has(account.uid) ? (
-                <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-              ) : (
-                <Circle className="h-5 w-5 text-gray-300" />
-              )}
-              <Landmark className="h-5 w-5 text-gray-400" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {account.name || "Account"}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {account.iban ? formatIBAN(account.iban) : "No IBAN"} · {account.currency}
-                </p>
+        {bankAccounts.map((account) => {
+          const isSelected = selected.has(account.uid);
+          return (
+            <Card
+              key={account.uid}
+              onClick={() => toggleAccount(account.uid)}
+              className={`cursor-pointer transition ${
+                isSelected
+                  ? "!border-[var(--color-tertiary)] !bg-[rgba(184,66,46,0.06)]"
+                  : "hover:!border-[var(--color-border-strong)]"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {isSelected ? (
+                  <CheckCircle2 className="h-5 w-5 text-[var(--color-tertiary)]" />
+                ) : (
+                  <Circle className="h-5 w-5 text-[var(--color-secondary)]" />
+                )}
+                <Landmark className="h-5 w-5 text-[var(--color-secondary)]" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[var(--color-primary)]">
+                    {account.name || "Account"}
+                  </p>
+                  <p className="truncate text-xs text-[var(--color-secondary)]">
+                    {account.iban ? formatIBAN(account.iban) : "No IBAN"} · {account.currency}
+                  </p>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row">
         <button
           onClick={() => router.push("/accounts")}
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="btn btn-secondary flex-1"
         >
           Cancel
         </button>
         <button
           onClick={handleConfirm}
           disabled={selected.size === 0 || loading}
-          className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="btn btn-primary flex-1"
         >
           {loading ? "Linking..." : `Link ${selected.size} Account${selected.size !== 1 ? "s" : ""}`}
         </button>
@@ -152,7 +158,6 @@ export default function SelectBankAccountsPage() {
 }
 
 function formatIBAN(iban: string): string {
-  // Show last 4 chars masked: **** **** **** 1234
   if (iban.length <= 4) return iban;
   return "•••• " + iban.slice(-4);
 }

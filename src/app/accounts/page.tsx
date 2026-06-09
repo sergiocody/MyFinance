@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import { format, startOfMonth, subMonths } from "date-fns";
-import { Plus, Pencil, Trash2, RefreshCw, Link2, Wifi, WifiOff, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Link2,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import type { Account, BankConnection } from "@/lib/database.types";
 
 const ACCOUNT_TYPES = [
@@ -20,8 +30,8 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 const COLORS = [
-  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#0ea5e9",
+  "#1A1C1E", "#6C7278", "#B8422E", "#3F6B4E", "#A86E2A",
+  "#3A4F66", "#8C5A3C", "#4F4A45", "#7A8C7E", "#5C2E1F",
 ];
 
 const MONTH_COUNT = 6;
@@ -114,7 +124,7 @@ function AccountTrendSparkline({
   color: string;
 }) {
   if (points.length === 0) {
-    return <div className="h-14 rounded-lg bg-gray-50" />;
+    return <div className="h-14 rounded-sm bg-[rgba(26,28,30,0.04)]" />;
   }
 
   const width = 180;
@@ -144,17 +154,12 @@ function AccountTrendSparkline({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-gray-400">
+      <div className="font-label flex items-center justify-between text-[10px] text-[var(--color-secondary)]">
         <span>6M Evolution</span>
         <span>{points[0]?.label} - {points.at(-1)?.label}</span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full overflow-visible">
-        <polyline
-          points={areaPoints}
-          fill={color}
-          fillOpacity="0.12"
-          stroke="none"
-        />
+        <polyline points={areaPoints} fill={color} fillOpacity="0.12" stroke="none" />
         <polyline
           points={polylinePoints}
           fill="none"
@@ -176,8 +181,8 @@ function AccountTrendSparkline({
         ))}
       </svg>
       <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-400">Click to view transactions</span>
-        <span className={delta >= 0 ? "font-medium text-green-600" : "font-medium text-red-600"}>
+        <span className="text-[var(--color-secondary)]">Click to view transactions</span>
+        <span className={`font-medium ${delta >= 0 ? "amount-pos" : "amount-neg"}`}>
           {delta >= 0 ? "+" : ""}
           {formatCurrency(delta)}
         </span>
@@ -284,14 +289,16 @@ function BankConnectFlow({
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+        <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+          Country
+        </label>
         <select
           value={country}
           onChange={(e) => {
             setCountry(e.target.value);
             setSearch("");
           }}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="field"
         >
           {COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>{c.label}</option>
@@ -305,13 +312,13 @@ function BankConnectFlow({
           placeholder="Search banks..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="field"
         />
       </div>
 
       {loadingInstitutions ? (
         <div className="flex justify-center py-8">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-tertiary)] border-t-transparent" />
         </div>
       ) : (
         <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -320,30 +327,23 @@ function BankConnectFlow({
               key={inst.id}
               onClick={() => handleSelectInstitution(inst)}
               disabled={connecting}
-              className="flex w-full items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+              className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[rgba(26,28,30,0.04)] disabled:opacity-50"
             >
               {inst.logo && (
-                <img
-                  src={inst.logo}
-                  alt=""
-                  className="h-6 w-6 rounded object-contain"
-                />
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={inst.logo} alt="" className="h-6 w-6 rounded-sm object-contain" />
               )}
-              <span className="font-medium text-gray-900">{inst.name}</span>
+              <span className="font-medium text-[var(--color-primary)]">{inst.name}</span>
             </button>
           ))}
           {filtered.length === 0 && !loadingInstitutions && (
-            <p className="py-4 text-center text-sm text-gray-500">No banks found</p>
+            <p className="py-4 text-center text-sm text-[var(--color-secondary)]">No banks found</p>
           )}
         </div>
       )}
 
       <div className="flex justify-end pt-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
+        <button type="button" onClick={onClose} className="btn btn-secondary">
           Cancel
         </button>
       </div>
@@ -372,7 +372,7 @@ export default function AccountsPage() {
     bank_name: "",
     iban: "",
     initial_balance: "0",
-    color: "#3b82f6",
+    color: COLORS[5],
     currency: "EUR",
     account_mode: "manual" as "manual" | "automated",
     account_class: "standard" as "standard" | "remunerated" | "investment",
@@ -386,17 +386,12 @@ export default function AccountsPage() {
       .split("T")[0];
 
     const [{ data: accountRows }, { data: transactionRows }, { data: connectionRows }] = await Promise.all([
-      supabase
-        .from("accounts")
-        .select("*")
-        .order("name"),
+      supabase.from("accounts").select("*").order("name"),
       supabase
         .from("transactions")
         .select("account_id, transfer_to_account_id, type, amount, date")
         .gte("date", periodStart),
-      supabase
-        .from("bank_connections")
-        .select("*"),
+      supabase.from("bank_connections").select("*"),
     ]);
 
     if (accountRows) {
@@ -428,7 +423,7 @@ export default function AccountsPage() {
       bank_name: "",
       iban: "",
       initial_balance: "0",
-      color: "#3b82f6",
+      color: COLORS[5],
       currency: "EUR",
       account_mode: "manual",
       account_class: "standard",
@@ -495,7 +490,6 @@ export default function AccountsPage() {
     const account = accounts.find(a => a.id === id);
     if (!account) return;
 
-    // Check if account has transactions (as source or transfer destination)
     const { count } = await supabase
       .from("transactions")
       .select("*", { count: "exact", head: true })
@@ -506,11 +500,8 @@ export default function AccountsPage() {
       setMigrateTarget("");
     } else {
       if (!confirm("Delete this empty account?")) return;
-      // Delete related bank connections first
       await supabase.from("bank_connections").delete().eq("account_id", id);
-      // Clear imports reference
       await supabase.from("imports").update({ account_id: null }).eq("account_id", id);
-      // Delete the account
       const { error } = await supabase.from("accounts").delete().eq("id", id);
       if (error) {
         showToast("error", `Failed to delete: ${error.message}`);
@@ -525,24 +516,19 @@ export default function AccountsPage() {
     if (!deleteModal || !migrateTarget) return;
     const sourceId = deleteModal.account.id;
 
-    // Migrate transactions where this account is the source
     await supabase
       .from("transactions")
       .update({ account_id: migrateTarget })
       .eq("account_id", sourceId);
 
-    // Migrate transactions where this account is the transfer destination
     await supabase
       .from("transactions")
       .update({ transfer_to_account_id: migrateTarget })
       .eq("transfer_to_account_id", sourceId);
 
-    // Delete related bank connections first
     await supabase.from("bank_connections").delete().eq("account_id", sourceId);
-    // Clear imports reference
     await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
-    // Now delete the account (no more references)
-    const { error } = await supabase.from("accounts").delete().eq("id", sourceId);
+    await supabase.from("accounts").delete().eq("id", sourceId);
 
     setDeleteModal(null);
     showToast("success", `Account deleted. ${deleteModal.txCount} transactions moved.`);
@@ -553,16 +539,13 @@ export default function AccountsPage() {
     if (!deleteModal) return;
     const sourceId = deleteModal.account.id;
 
-    // Clear transfer references in other accounts' transactions
     await supabase
       .from("transactions")
       .update({ transfer_to_account_id: null })
       .eq("transfer_to_account_id", sourceId);
 
-    // Clear imports reference
     await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
 
-    // Delete account (CASCADE deletes transactions + bank_connections)
     const { error } = await supabase.from("accounts").delete().eq("id", sourceId);
 
     setDeleteModal(null);
@@ -615,7 +598,10 @@ export default function AccountsPage() {
         showToast("error", `Sync failed: ${error}`);
       } else {
         const result = await res.json();
-        const balanceText = result.balance != null ? ` · Balance: ${formatCurrency(result.balance, result.currency)}` : "";
+        const balanceText =
+          result.balance != null
+            ? ` · Balance: ${formatCurrency(result.balance, result.currency)}`
+            : "";
         showToast("success", `${result.imported} imported, ${result.skipped} skipped${balanceText}`);
         loadAccounts();
       }
@@ -665,41 +651,50 @@ export default function AccountsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pt-12 lg:pt-0">
+    <div className="space-y-6">
       {toast && (
         <div
-          className={`fixed top-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg px-4 py-3 shadow-lg transition-all ${
-            toast.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
+          className={`fixed left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md px-4 py-3 lg:top-4 ${
+            toast.type === "success" ? "notice notice-success" : "notice notice-danger"
           }`}
         >
-          {toast.type === "success" ? <CheckCircle2 size={18} className="text-green-600" /> : <XCircle size={18} className="text-red-600" />}
+          {toast.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
           <span className="text-sm font-medium">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-gray-400 hover:text-gray-600">&times;</button>
+          <button
+            onClick={() => setToast(null)}
+            className="ml-2 text-current/70 hover:text-current"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
-        <div className="flex items-center gap-2">
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-label text-[11px] text-[var(--color-secondary)]">Money</p>
+          <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+            Accounts
+          </h1>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {accounts.some(a => a.account_mode === "automated") && (
             <button
               onClick={handleSyncAll}
               disabled={syncingAll}
-              className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              className="btn btn-secondary"
             >
               <RefreshCw size={16} className={syncingAll ? "animate-spin" : ""} />
               Sync All
             </button>
           )}
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
+          <button onClick={openCreate} className="btn btn-primary">
             <Plus size={16} />
             Add Account
           </button>
@@ -719,40 +714,45 @@ export default function AccountsPage() {
                 openTransactionsForAccount(account.id);
               }
             }}
-            className={`cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+            className={`cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[rgba(184,66,46,0.4)] focus:ring-offset-2 ${
               !account.is_active ? "opacity-50" : ""
             } ${
-              account.account_mode === "automated" ? "!border-l-[4px] !border-l-indigo-500" : ""
+              account.account_mode === "automated"
+                ? "!border-l-[3px] !border-l-[var(--color-tertiary)]"
+                : ""
             }`}
-            style={account.account_mode === "automated" ? { background: "linear-gradient(90deg, rgba(99,102,241,0.08) 0%, transparent 30%)" } : undefined}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-3">
                 <div
-                  className="h-4 w-4 rounded-full"
+                  className="h-4 w-4 flex-none rounded-full"
                   style={{ backgroundColor: account.color }}
                 />
-                <div>
-                  <h3 className="font-semibold text-gray-900">{account.name}</h3>
-                  <p className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold text-[var(--color-primary)]">{account.name}</h3>
+                  <p className="truncate text-xs text-[var(--color-secondary)]">
                     {account.bank_name && `${account.bank_name} · `}
                     {ACCOUNT_TYPES.find((t) => t.value === account.type)?.label}
                   </p>
                   {account.iban && (
-                    <p className="mt-0.5 max-w-[180px] truncate text-[11px] text-gray-400" title={account.iban}>
+                    <p
+                      className="mt-0.5 max-w-[180px] truncate text-[11px] text-[var(--color-secondary)]"
+                      title={account.iban}
+                    >
                       IBAN {account.iban}
                     </p>
                   )}
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex flex-none gap-1">
                 <button
                   onClick={(event) => {
                     stopCardNavigation(event);
                     openEdit(account);
                   }}
                   onKeyDown={(event) => event.stopPropagation()}
-                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="Edit account"
+                  className="btn btn-ghost px-2 py-1.5"
                 >
                   <Pencil size={14} />
                 </button>
@@ -762,7 +762,8 @@ export default function AccountsPage() {
                     handleDelete(account.id);
                   }}
                   onKeyDown={(event) => event.stopPropagation()}
-                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  aria-label="Delete account"
+                  className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -772,42 +773,59 @@ export default function AccountsPage() {
             <div className="mt-4">
               {accounts.some(a => a.parent_account_id === account.id) ? (
                 <>
-                  <p className="text-xs text-gray-500">Effective Balance</p>
-                  <p className={`text-xl font-bold ${
-                    Number(account.current_balance) - accounts.filter(a => a.parent_account_id === account.id).reduce((sum, a) => sum + Number(a.current_balance), 0) >= 0
-                      ? "text-gray-900" : "text-red-600"
-                  }`}>
+                  <p className="text-xs text-[var(--color-secondary)]">Effective Balance</p>
+                  <p
+                    className={`text-xl font-bold ${
+                      Number(account.current_balance) -
+                        accounts
+                          .filter(a => a.parent_account_id === account.id)
+                          .reduce((sum, a) => sum + Number(a.current_balance), 0) >=
+                      0
+                        ? "text-[var(--color-primary)]"
+                        : "amount-neg"
+                    }`}
+                  >
                     {formatCurrency(
-                      Number(account.current_balance) - accounts
-                        .filter(a => a.parent_account_id === account.id)
-                        .reduce((sum, a) => sum + Number(a.current_balance), 0),
+                      Number(account.current_balance) -
+                        accounts
+                          .filter(a => a.parent_account_id === account.id)
+                          .reduce((sum, a) => sum + Number(a.current_balance), 0),
                       account.currency
                     )}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-[var(--color-secondary)]">
                     Bank total: {formatCurrency(Number(account.current_balance), account.currency)}
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-xs text-gray-500">Current Balance</p>
-                  <p className={`text-xl font-bold ${Number(account.current_balance) >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                  <p className="text-xs text-[var(--color-secondary)]">Current Balance</p>
+                  <p
+                    className={`text-xl font-bold ${
+                      Number(account.current_balance) >= 0
+                        ? "text-[var(--color-primary)]"
+                        : "amount-neg"
+                    }`}
+                  >
                     {formatCurrency(Number(account.current_balance), account.currency)}
                   </p>
                 </>
               )}
             </div>
 
-            {/* Bank connection status for automated accounts */}
             {account.account_mode === "automated" && (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {bankConnections[account.id]?.status === "linked" ? (
                   <>
-                    <Wifi size={12} className="text-green-600" />
-                    <span className="text-xs text-green-700">Connected</span>
+                    <Wifi size={12} className="text-[var(--color-success)]" />
+                    <span className="text-xs text-[var(--color-success)]">Connected</span>
                     {bankConnections[account.id]?.last_synced_at && (
-                      <span className="text-xs text-gray-400">
-                        · Synced {format(new Date(bankConnections[account.id].last_synced_at!), "dd MMM HH:mm")}
+                      <span className="text-xs text-[var(--color-secondary)]">
+                        · Synced{" "}
+                        {format(
+                          new Date(bankConnections[account.id].last_synced_at!),
+                          "dd MMM HH:mm"
+                        )}
                       </span>
                     )}
                     <button
@@ -817,16 +835,20 @@ export default function AccountsPage() {
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
                       disabled={syncing === account.id}
-                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-tertiary)]"
                     >
-                      <RefreshCw size={12} className={syncing === account.id ? "animate-spin" : ""} />
+                      <RefreshCw
+                        size={12}
+                        className={syncing === account.id ? "animate-spin" : ""}
+                      />
                       Sync
                     </button>
                   </>
-                ) : bankConnections[account.id]?.status === "expired" || bankConnections[account.id]?.status === "error" ? (
+                ) : bankConnections[account.id]?.status === "expired" ||
+                  bankConnections[account.id]?.status === "error" ? (
                   <>
-                    <WifiOff size={12} className="text-amber-600" />
-                    <span className="text-xs text-amber-700">
+                    <WifiOff size={12} className="text-[var(--color-warning)]" />
+                    <span className="text-xs text-[var(--color-warning)]">
                       {bankConnections[account.id]?.status === "expired" ? "Expired" : "Error"}
                     </span>
                     <button
@@ -835,7 +857,7 @@ export default function AccountsPage() {
                         handleConnectBank(account.id);
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-warning)]"
                     >
                       <Link2 size={12} />
                       Reconnect
@@ -843,15 +865,15 @@ export default function AccountsPage() {
                   </>
                 ) : (
                   <>
-                    <WifiOff size={12} className="text-gray-400" />
-                    <span className="text-xs text-gray-500">Not connected</span>
+                    <WifiOff size={12} className="text-[var(--color-secondary)]" />
+                    <span className="text-xs text-[var(--color-secondary)]">Not connected</span>
                     <button
                       onClick={(event) => {
                         stopCardNavigation(event);
                         handleConnectBank(account.id);
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-tertiary)]"
                     >
                       <Link2 size={12} />
                       Connect Bank
@@ -875,11 +897,7 @@ export default function AccountsPage() {
                   toggleActive(account);
                 }}
                 onKeyDown={(event) => event.stopPropagation()}
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  account.is_active
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-500"
-                }`}
+                className={`chip ${account.is_active ? "chip-success" : ""}`}
               >
                 {account.is_active ? "Active" : "Inactive"}
               </button>
@@ -891,7 +909,7 @@ export default function AccountsPage() {
       {accounts.length === 0 && (
         <Card>
           <div className="py-12 text-center">
-            <p className="text-gray-500">No accounts yet. Create your first one!</p>
+            <p className="text-sm text-[var(--color-secondary)]">No accounts yet. Create your first one!</p>
           </div>
         </Card>
       )}
@@ -901,59 +919,70 @@ export default function AccountsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? "Edit Account" : "New Account"}
+        mobileSheet
       >
         <form onSubmit={handleSave} className="space-y-4">
           {!editing && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Account Mode</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Account Mode
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, account_mode: "manual" })}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  className={`rounded-md border px-3 py-3 text-left text-sm font-medium transition ${
                     form.account_mode === "manual"
-                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.08)] text-[var(--color-tertiary)]"
+                      : "border-[var(--color-border)] text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
                   }`}
                 >
                   Manual
-                  <span className="mt-0.5 block text-xs font-normal opacity-70">Cash, Investments</span>
+                  <span className="mt-0.5 block text-xs font-normal opacity-70">
+                    Cash, Investments
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, account_mode: "automated" })}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  className={`rounded-md border px-3 py-3 text-left text-sm font-medium transition ${
                     form.account_mode === "automated"
-                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.08)] text-[var(--color-tertiary)]"
+                      : "border-[var(--color-border)] text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
                   }`}
                 >
                   Automated
-                  <span className="mt-0.5 block text-xs font-normal opacity-70">Bank connection</span>
+                  <span className="mt-0.5 block text-xs font-normal opacity-70">
+                    Bank connection
+                  </span>
                 </button>
               </div>
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              Name
+            </label>
             <input
               type="text"
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
               placeholder="e.g., Main Checking"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Type
+              </label>
               <select
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value as Account["type"] })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="field"
               >
                 {ACCOUNT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -961,44 +990,50 @@ export default function AccountsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Currency
+              </label>
               <input
                 type="text"
                 value={form.currency}
                 onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="field"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Bank Name</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              Bank Name
+            </label>
             <input
               type="text"
               value={form.bank_name}
               onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
               placeholder="e.g., ING, BBVA"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">IBAN / Account number</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              IBAN / Account number
+            </label>
             <input
               type="text"
               value={form.iban}
               onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
               placeholder="e.g., ES8001287820840104072774"
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-[var(--color-secondary)]">
               Used to detect transfers automatically during CSV imports and bank sync.
             </p>
           </div>
 
           {!editing && form.account_mode === "manual" && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                 Initial Balance (€)
               </label>
               <input
@@ -1006,34 +1041,44 @@ export default function AccountsPage() {
                 step="0.01"
                 value={form.initial_balance}
                 onChange={(e) => setForm({ ...form, initial_balance: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="field"
               />
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
-            <div className="flex gap-2">
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              Color
+            </label>
+            <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setForm({ ...form, color: c })}
-                  className={`h-6 w-6 rounded-full border-2 ${
-                    form.color === c ? "border-gray-900" : "border-transparent"
+                  className={`h-7 w-7 rounded-full border-2 transition ${
+                    form.color === c ? "border-[var(--color-primary)]" : "border-transparent"
                   }`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
               ))}
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Account class</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              Account class
+            </label>
             <select
               value={form.account_class}
-              onChange={(e) => setForm({ ...form, account_class: e.target.value as "standard" | "remunerated" | "investment" })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  account_class: e.target.value as "standard" | "remunerated" | "investment",
+                })
+              }
+              className="field"
             >
               <option value="standard">Non-remunerated</option>
               <option value="remunerated">Remunerated</option>
@@ -1042,11 +1087,13 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Sub-account of</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              Sub-account of
+            </label>
             <select
               value={form.parent_account_id}
               onChange={(e) => setForm({ ...form, parent_account_id: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
             >
               <option value="">None (independent account)</option>
               {accounts
@@ -1057,23 +1104,17 @@ export default function AccountsPage() {
                   </option>
                 ))}
             </select>
-            <p className="mt-1 text-xs text-gray-400">
-              If set, this account&apos;s balance will be subtracted from the parent&apos;s displayed balance.
+            <p className="mt-1 text-xs text-[var(--color-secondary)]">
+              If set, this account&apos;s balance will be subtracted from the parent&apos;s
+              displayed balance.
             </p>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setModalOpen(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
+            <button type="submit" className="btn btn-primary">
               {editing ? "Update" : "Create"}
             </button>
           </div>
@@ -1085,20 +1126,21 @@ export default function AccountsPage() {
         open={!!deleteModal}
         onClose={() => setDeleteModal(null)}
         title="Delete Account"
+        mobileSheet
       >
         {deleteModal && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-[var(--color-primary)]">
               <strong>{deleteModal.account.name}</strong> has{" "}
               <strong>{deleteModal.txCount}</strong> linked transactions.
             </p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--color-secondary)]">
               Move them to another account, or delete everything:
             </p>
             <select
               value={migrateTarget}
               onChange={(e) => setMigrateTarget(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
             >
               <option value="">Select account to migrate...</option>
               {accounts
@@ -1109,18 +1151,18 @@ export default function AccountsPage() {
                   </option>
                 ))}
             </select>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setDeleteModal(null)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDeleteAll}
-                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                className="btn btn-danger-outline"
               >
                 Delete All
               </button>
@@ -1128,7 +1170,7 @@ export default function AccountsPage() {
                 type="button"
                 disabled={!migrateTarget}
                 onClick={confirmDeleteWithMigration}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="btn btn-danger"
               >
                 Move &amp; Delete
               </button>
@@ -1142,6 +1184,7 @@ export default function AccountsPage() {
         open={connectModalOpen}
         onClose={() => setConnectModalOpen(false)}
         title="Connect Bank Account"
+        mobileSheet
       >
         <BankConnectFlow
           accountId={connectAccountId}

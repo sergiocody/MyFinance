@@ -16,9 +16,7 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
   const selectedLabels = labels.filter((label) => selectedIds.includes(label.id));
 
   useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
+    if (!open) return undefined;
 
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -31,7 +29,6 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -51,10 +48,10 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
 
   return (
     <div ref={containerRef} className="relative w-full min-w-0">
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-white">
         <div className="flex min-h-10 flex-wrap items-center gap-1.5 px-2 py-2">
           {selectedLabels.length === 0 ? (
-            <span className="text-[11px] text-gray-400">No labels selected</span>
+            <span className="text-[11px] text-[var(--color-secondary)]">No labels selected</span>
           ) : (
             selectedLabels.map((label) => (
               <span
@@ -78,7 +75,7 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
-          className="flex w-full items-center justify-between border-t border-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50"
+          className="flex w-full items-center justify-between border-t border-[var(--color-border)] px-2 py-1.5 text-[11px] font-medium text-[var(--color-secondary)] transition hover:bg-[rgba(26,28,30,0.04)]"
         >
           <span>
             {selectedLabels.length > 0
@@ -92,9 +89,9 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
       </div>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white p-1 shadow-lg sm:w-64">
+        <div className="surface-card-strong absolute left-0 top-full z-20 mt-2 w-full rounded-md p-1 sm:w-64">
           {labels.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-gray-400">No labels available</p>
+            <p className="px-3 py-2 text-xs text-[var(--color-secondary)]">No labels available</p>
           ) : (
             <div className="max-h-56 overflow-y-auto">
               {labels.map((label) => {
@@ -105,8 +102,10 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
                     key={label.id}
                     type="button"
                     onClick={() => toggleLabel(label.id)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
-                      selected ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                    className={`flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs transition ${
+                      selected
+                        ? "bg-[rgba(184,66,46,0.10)] text-[var(--color-tertiary)]"
+                        : "text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)] hover:text-[var(--color-primary)]"
                     }`}
                   >
                     <span

@@ -215,6 +215,15 @@ function isDuplicateKeyError(error: { code?: string } | null | undefined) {
   return error?.code === "23505";
 }
 
+const TYPE_SELECT_CLASS: Record<"income" | "expense" | "transfer", string> = {
+  income:
+    "border-[rgba(63,107,78,0.32)] bg-[rgba(63,107,78,0.08)] text-[var(--color-success)]",
+  expense:
+    "border-[rgba(184,66,46,0.32)] bg-[rgba(184,66,46,0.08)] text-[var(--color-danger)]",
+  transfer:
+    "border-[rgba(58,79,102,0.32)] bg-[rgba(58,79,102,0.08)] text-[var(--color-info)]",
+};
+
 export default function ImportPage() {
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -239,7 +248,6 @@ export default function ImportPage() {
   const currentAccountId = currentAccount?.id ?? null;
   const currentAccountBalance = currentAccount?.current_balance ?? null;
 
-  // When account changes, reset override to its stored balance
   useEffect(() => {
     if (currentAccountBalance !== null) {
       setBalanceOverride(String(currentAccountBalance));
@@ -281,10 +289,8 @@ export default function ImportPage() {
         return;
       }
 
-      // Read and parse CSV
       const text = await file.text();
 
-      // Quick pre-parse to check if it looks like CSV
       const lines = text.trim().split("\n");
       if (lines.length < 2) {
         setError("File appears empty or has only headers");
@@ -680,28 +686,32 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="space-y-6 pt-12 lg:pt-0">
-      <h1 className="text-2xl font-bold text-gray-900">Import Transactions</h1>
+    <div className="space-y-6">
+      <div>
+        <p className="font-label text-[11px] text-[var(--color-secondary)]">Ledger</p>
+        <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+          Import Transactions
+        </h1>
+      </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="notice notice-danger flex items-center gap-2">
           <XCircle size={16} />
           {error}
         </div>
       )}
 
-      {/* Account selection */}
       {step === "upload" && (
         <Card>
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                 Import into Account
               </label>
               <select
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
-                className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="field max-w-sm"
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -712,24 +722,23 @@ export default function ImportPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                 Parser
               </label>
               <select
                 value={parserProvider}
                 onChange={(e) => setParserProvider(e.target.value as ParserProvider)}
-                className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="field max-w-sm"
               >
                 <option value="gemini">Gemini</option>
                 <option value="ollama-gemma">Ollama Gemma (gemma3:4b)</option>
                 <option value="ollama-qwen">Ollama Qwen (qwen3:8b)</option>
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-[var(--color-secondary)]">
                 {parserOptions[parserProvider].description}
               </p>
             </div>
 
-            {/* Drop zone */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => {
@@ -737,20 +746,20 @@ export default function ImportPage() {
                 setDragOver(true);
               }}
               onDragLeave={() => setDragOver(false)}
-              className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
+              className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed p-8 transition-colors sm:p-12 ${
                 dragOver
-                  ? "border-indigo-500 bg-indigo-50"
-                  : "border-gray-300 hover:border-gray-400"
+                  ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.06)]"
+                  : "border-[var(--color-border-strong)] hover:border-[var(--color-secondary)]"
               }`}
             >
-              <Upload className="mb-4 h-12 w-12 text-gray-400" />
-              <p className="mb-2 text-sm font-medium text-gray-700">
+              <Upload className="mb-4 h-10 w-10 text-[var(--color-secondary)] sm:h-12 sm:w-12" />
+              <p className="mb-2 text-sm font-medium text-[var(--color-primary)]">
                 Drop your CSV file here
               </p>
-              <p className="mb-4 text-xs text-gray-500">
+              <p className="mb-4 text-xs text-[var(--color-secondary)]">
                 or click to browse. Supports CSV exports from most banks.
               </p>
-              <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              <label className="btn btn-primary cursor-pointer">
                 Browse Files
                 <input
                   type="file"
@@ -760,9 +769,10 @@ export default function ImportPage() {
                 />
               </label>
             </div>
-            <div className="rounded-lg bg-blue-50 px-4 py-3">
-              <p className="text-sm font-medium text-blue-800">How it works</p>
-              <ol className="mt-1 list-inside list-decimal text-xs text-blue-700 space-y-1">
+
+            <div className="notice notice-info">
+              <p className="font-medium">How it works</p>
+              <ol className="mt-1 list-inside list-decimal space-y-1 text-xs">
                 <li>Select the account to import into</li>
                 <li>Choose Gemini, Ollama Gemma, or Ollama Qwen as the parser</li>
                 <li>Drop your bank CSV export file</li>
@@ -774,59 +784,56 @@ export default function ImportPage() {
         </Card>
       )}
 
-      {/* Parsing state */}
       {step === "parsing" && (
         <Card>
           <div className="flex flex-col items-center py-12">
-            <Loader2 className="mb-4 h-10 w-10 animate-spin text-indigo-600" />
-            <p className="font-medium text-gray-900">Analyzing your file with {parserLabel}...</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" />
+            <p className="font-medium text-[var(--color-primary)]">
+              Analyzing your file with {parserLabel}...
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-secondary)]">
               Parsing {fileName} and categorizing transactions with {parserLabel}
             </p>
           </div>
         </Card>
       )}
 
-      {/* Review state */}
       {step === "review" && (
         <>
           <Card>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-indigo-500" />
-                <div>
-                  <p className="font-medium text-gray-900">{fileName}</p>
-                  <p className="text-xs text-gray-500">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <FileText className="mt-0.5 h-5 w-5 text-[var(--color-tertiary)]" />
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-[var(--color-primary)]">{fileName}</p>
+                  <p className="text-xs text-[var(--color-secondary)]">
                     {transactions.length} transactions found ·{" "}
                     {transactions.filter((t) => t.selected).length} selected
                   </p>
                   {currentAccount && (
-                    <p className="mt-0.5 text-xs font-medium text-indigo-600">
+                    <p className="mt-0.5 text-xs font-medium text-[var(--color-tertiary)]">
                       → Importing into: {currentAccount.name}
                       {currentAccount.bank_name ? ` (${currentAccount.bank_name})` : ""}
                     </p>
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={reset}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button onClick={reset} className="btn btn-secondary">
                   Cancel
                 </button>
                 <button
                   onClick={handleImport}
                   disabled={transactions.filter((t) => t.selected).length === 0}
-                  className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="btn btn-primary"
                 >
                   Import {transactions.filter((t) => t.selected).length} Transactions
                 </button>
               </div>
             </div>
             {projectedBalance !== null && currentAccount && (
-              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-gray-100 pt-3 text-sm">
-                <span className="flex items-center gap-1.5 text-gray-500">
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-[var(--color-border)] pt-3 text-sm">
+                <span className="flex items-center gap-1.5 text-[var(--color-secondary)]">
                   Saldo actual:&nbsp;
                   {editingBalance ? (
                     <input
@@ -835,33 +842,38 @@ export default function ImportPage() {
                       value={balanceOverride}
                       onChange={(e) => setBalanceOverride(e.target.value)}
                       onBlur={() => setEditingBalance(false)}
-                      onKeyDown={(e) => { if (e.key === "Enter") setEditingBalance(false); }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") setEditingBalance(false);
+                      }}
                       autoFocus
-                      className="w-28 rounded border border-indigo-400 px-2 py-0.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="field w-28 px-2 py-0.5 text-sm font-medium"
                     />
                   ) : (
                     <button
                       onClick={() => setEditingBalance(true)}
                       title="Haz clic para corregir el saldo actual"
-                      className="font-medium text-gray-900 underline decoration-dashed underline-offset-2 hover:text-indigo-600"
+                      className="font-medium text-[var(--color-primary)] underline decoration-dashed underline-offset-2 hover:text-[var(--color-tertiary)]"
                     >
                       {formatCurrency(baseBalance)}
                     </button>
                   )}
-                  <span className="text-xs text-gray-400">(editable)</span>
+                  <span className="text-xs text-[var(--color-secondary)]">(editable)</span>
                 </span>
-                <span className="text-gray-400">→</span>
-                <span className="text-gray-500">
+                <span className="text-[var(--color-secondary)]">→</span>
+                <span className="text-[var(--color-secondary)]">
                   Saldo proyectado:{" "}
-                  <span className={`font-semibold ${projectedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  <span
+                    className={`font-semibold ${projectedBalance >= 0 ? "amount-pos" : "amount-neg"}`}
+                  >
                     {formatCurrency(projectedBalance)}
                   </span>
                 </span>
                 {(() => {
                   const delta = projectedBalance - baseBalance;
                   return delta !== 0 ? (
-                    <span className={`text-xs ${delta > 0 ? "text-green-500" : "text-red-500"}`}>
-                      ({delta > 0 ? "+" : ""}{formatCurrency(delta)})
+                    <span className={`text-xs ${delta > 0 ? "amount-pos" : "amount-neg"}`}>
+                      ({delta > 0 ? "+" : ""}
+                      {formatCurrency(delta)})
                     </span>
                   ) : null;
                 })()}
@@ -870,23 +882,21 @@ export default function ImportPage() {
           </Card>
 
           {transactions.some((tx) => tx.duplicateSource) && (
-            <Card>
-              <div className="flex items-start gap-3 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-                <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" />
-                <div>
-                  <p className="font-medium">Duplicate transactions detected</p>
-                  <p className="mt-1 text-amber-700">
-                    Existing duplicates and duplicate rows within the uploaded file are unselected automatically.
-                  </p>
-                </div>
+            <div className="notice notice-warning flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" />
+              <div>
+                <p className="font-medium">Duplicate transactions detected</p>
+                <p className="mt-1">
+                  Existing duplicates and duplicate rows within the uploaded file are unselected automatically.
+                </p>
               </div>
-            </Card>
+            </div>
           )}
 
           <Card className="overflow-x-auto p-0!">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase text-gray-500">
+                <tr className="border-b border-[var(--color-border)] text-left">
                   <th className="px-4 py-3">
                     <input
                       type="checkbox"
@@ -895,24 +905,24 @@ export default function ImportPage() {
                         transactions.filter((t) => !t.validationError).every((t) => t.selected)
                       }
                       onChange={toggleAll}
-                      className="rounded"
+                      className="rounded-sm"
                     />
                   </th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Transfer</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Labels</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Date</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Description</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Status</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Type</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Transfer</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Category</th>
+                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Labels</th>
+                  <th className="font-label px-4 py-3 text-right text-[11px] text-[var(--color-secondary)]">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {transactions.map((tx, i) => (
                   <tr
                     key={i}
-                    className={`${tx.selected ? "bg-white" : "bg-gray-50 opacity-60"}`}
+                    className={tx.selected ? "" : "bg-[rgba(26,28,30,0.02)] opacity-60"}
                   >
                     <td className="px-4 py-3">
                       <input
@@ -920,23 +930,23 @@ export default function ImportPage() {
                         checked={tx.selected}
                         disabled={Boolean(tx.validationError)}
                         onChange={() => toggleTransaction(i)}
-                        className="rounded"
+                        className="rounded-sm"
                       />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                    <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
                       {tx.date}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{tx.description}</p>
-                      {tx.notes && <p className="text-xs text-gray-400">{tx.notes}</p>}
+                      <p className="font-medium text-[var(--color-primary)]">{tx.description}</p>
+                      {tx.notes && (
+                        <p className="text-xs text-[var(--color-secondary)]">{tx.notes}</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {tx.validationError ? (
-                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800">
-                          {tx.validationError}
-                        </span>
+                        <span className="chip chip-warning">{tx.validationError}</span>
                       ) : tx.duplicateSource ? (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+                        <span className="chip chip-warning">
                           {tx.type === "transfer" && tx.duplicateSource === "existing"
                             ? "Already reflected"
                             : tx.duplicateSource === "existing"
@@ -944,9 +954,7 @@ export default function ImportPage() {
                               : "Repeated in file"}
                         </span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                          New
-                        </span>
+                        <span className="chip chip-success">New</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -955,13 +963,7 @@ export default function ImportPage() {
                         onChange={(e) =>
                           updateType(i, e.target.value as "income" | "expense" | "transfer")
                         }
-                        className={`rounded border px-2 py-1 text-xs font-medium ${
-                          tx.type === "income"
-                            ? "border-green-200 bg-green-50 text-green-700"
-                            : tx.type === "expense"
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-blue-200 bg-blue-50 text-blue-700"
-                        }`}
+                        className={`rounded-sm border px-2 py-1 text-xs font-medium ${TYPE_SELECT_CLASS[tx.type]}`}
                       >
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
@@ -974,7 +976,7 @@ export default function ImportPage() {
                           <select
                             value={tx.transfer_account_id ?? ""}
                             onChange={(e) => updateTransferAccount(i, e.target.value)}
-                            className="min-w-40 rounded border border-gray-200 px-2 py-1 text-xs"
+                            className="field min-w-40 px-2 py-1 text-xs"
                           >
                             <option value="">Select account</option>
                             {accounts
@@ -988,21 +990,21 @@ export default function ImportPage() {
                           <select
                             value={tx.selected_account_role ?? "source"}
                             onChange={(e) => updateTransferRole(i, e.target.value as TransferRole)}
-                            className="min-w-32 rounded border border-gray-200 px-2 py-1 text-xs"
+                            className="field min-w-32 px-2 py-1 text-xs"
                           >
                             <option value="source">Outgoing</option>
                             <option value="destination">Incoming</option>
                           </select>
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs text-[var(--color-secondary)]">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <select
                         value={tx.category_id ?? ""}
                         onChange={(e) => updateCategory(i, e.target.value)}
-                        className="rounded border border-gray-200 px-2 py-1 text-xs"
+                        className="field px-2 py-1 text-xs"
                       >
                         <option value="">None</option>
                         {categories
@@ -1014,7 +1016,7 @@ export default function ImportPage() {
                           ))}
                       </select>
                       {tx.category_id && (
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-indigo-500">
+                        <p className="font-label mt-1 text-[10px] text-[var(--color-tertiary)]">
                           AI suggestion
                         </p>
                       )}
@@ -1026,7 +1028,7 @@ export default function ImportPage() {
                         onChange={(labelIds) => updateLabels(i, labelIds)}
                       />
                       {tx.label_ids.length > 0 && (
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-indigo-500">
+                        <p className="font-label mt-1 text-[10px] text-[var(--color-tertiary)]">
                           Suggested labels
                         </p>
                       )}
@@ -1035,12 +1037,12 @@ export default function ImportPage() {
                       <span
                         className={
                           tx.type === "income"
-                            ? "text-green-600"
+                            ? "amount-pos"
                             : tx.type === "expense"
-                              ? "text-red-600"
+                              ? "amount-neg"
                               : tx.selected_account_role === "destination"
-                                ? "text-green-600"
-                                : "text-blue-600"
+                                ? "amount-pos"
+                                : "amount-transfer"
                         }
                       >
                         {tx.type === "income"
@@ -1061,37 +1063,29 @@ export default function ImportPage() {
         </>
       )}
 
-      {/* Importing state */}
       {step === "importing" && (
         <Card>
           <div className="flex flex-col items-center py-12">
-            <Loader2 className="mb-4 h-10 w-10 animate-spin text-indigo-600" />
-            <p className="font-medium text-gray-900">Importing transactions...</p>
+            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" />
+            <p className="font-medium text-[var(--color-primary)]">Importing transactions...</p>
           </div>
         </Card>
       )}
 
-      {/* Done state */}
       {step === "done" && (
         <Card>
           <div className="flex flex-col items-center py-12">
-            <CheckCircle2 className="mb-4 h-12 w-12 text-green-500" />
-            <p className="text-lg font-semibold text-gray-900">Import Complete!</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <CheckCircle2 className="mb-4 h-12 w-12 text-[var(--color-success)]" />
+            <p className="text-lg font-semibold text-[var(--color-primary)]">Import Complete!</p>
+            <p className="mt-1 text-sm text-[var(--color-secondary)]">
               {importResult.imported} transactions imported
               {importResult.skipped > 0 && `, ${importResult.skipped} skipped`}
             </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={reset}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button onClick={reset} className="btn btn-secondary">
                 Import More
               </button>
-              <a
-                href="/transactions"
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              >
+              <a href="/transactions" className="btn btn-primary">
                 View Transactions
               </a>
             </div>
@@ -1099,7 +1093,6 @@ export default function ImportPage() {
         </Card>
       )}
 
-      {/* Import History */}
       <ImportHistory />
     </div>
   );
@@ -1133,15 +1126,18 @@ function ImportHistory() {
 
   return (
     <Card>
-      <h3 className="mb-4 text-sm font-medium text-gray-500">Recent Imports</h3>
+      <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">Recent Imports</h3>
       <div className="space-y-2">
         {imports.map((imp) => (
-          <div key={imp.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-2">
+          <div
+            key={imp.id}
+            className="flex items-center justify-between rounded-md border border-[var(--color-border)] px-4 py-2"
+          >
             <div className="flex items-center gap-3">
-              <FileText size={16} className="text-gray-400" />
+              <FileText size={16} className="text-[var(--color-secondary)]" />
               <div>
-                <p className="text-sm font-medium text-gray-900">{imp.filename}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-medium text-[var(--color-primary)]">{imp.filename}</p>
+                <p className="text-xs text-[var(--color-secondary)]">
                   {imp.accounts?.name} · {imp.rows_imported} imported
                   {imp.rows_skipped > 0 ? ` · ${imp.rows_skipped} skipped` : ""}
                   {imp.status !== "completed" ? ` · ${imp.status}` : ""}

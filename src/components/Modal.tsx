@@ -31,13 +31,13 @@ export default function Modal({
         mobileSheet ? "items-end sm:items-center" : "items-center px-4"
       )}
     >
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-[rgba(26,28,30,0.48)]" onClick={onClose} />
       <div
         className={cn(
           "surface-card-strong relative z-10 flex w-full flex-col overflow-hidden",
           mobileSheet
-            ? "h-[100dvh] max-h-[100dvh] rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-[28px]"
-            : "max-h-[90vh] rounded-xl",
+            ? "h-[100dvh] max-h-[100dvh] rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-md"
+            : "max-h-[90vh] rounded-md",
           size === "sm" && "sm:max-w-sm",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-2xl"
@@ -47,7 +47,8 @@ export default function Modal({
           <h2 className="text-lg font-semibold text-[var(--color-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.05)] hover:text-[var(--color-primary)]"
+            aria-label="Close"
+            className="btn btn-ghost px-2 py-2"
           >
             <X size={20} />
           </button>

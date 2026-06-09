@@ -33,14 +33,9 @@ type CsvCell = string | number | boolean;
 type CsvRow = Record<string, CsvCell>;
 
 const EXPORT_BATCH_SIZE = 1000;
-const buttonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60";
-const primaryButtonClassName =
-  `${buttonClassName} bg-(--color-primary) text-(--color-neutral) hover:bg-[rgba(26,28,30,0.92)]`;
-const secondaryButtonClassName =
-  `${buttonClassName} border border-(--color-border) bg-white text-(--color-primary) hover:bg-[rgba(26,28,30,0.04)]`;
-const inputClassName =
-  "w-full rounded-2xl border border-(--color-border) bg-white px-4 py-3 text-sm text-(--color-primary) outline-none transition focus:border-(--color-tertiary) focus:ring-2 focus:ring-[rgba(184,66,46,0.12)]";
+const primaryButtonClassName = "btn btn-ink";
+const secondaryButtonClassName = "btn btn-secondary";
+const inputClassName = "field";
 
 function createCountsState(): ExportCounts {
   return {
@@ -140,14 +135,14 @@ async function fetchPaginated<T>(
 
 function getFeedbackClassName(tone: FeedbackTone) {
   if (tone === "error") {
-    return "text-sm text-red-700";
+    return "text-sm text-[var(--color-danger)]";
   }
 
   if (tone === "success") {
-    return "text-sm text-emerald-700";
+    return "text-sm text-[var(--color-success)]";
   }
 
-  return "text-sm text-(--color-secondary)";
+  return "text-sm text-[var(--color-secondary)]";
 }
 
 export default function ExportPage() {
@@ -442,52 +437,42 @@ export default function ExportPage() {
   }
 
   return (
-    <div className="space-y-6 pt-12 lg:pt-0">
-      <section className="overflow-hidden rounded-[28px] border border-(--color-border) bg-[radial-gradient(circle_at_top_left,rgba(184,66,46,0.12),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,245,242,0.96)_100%)] px-6 py-8 shadow-[0_24px_48px_rgba(26,28,30,0.08)] sm:px-8">
-        <p className="font-label text-[11px] uppercase tracking-[0.22em] text-(--color-secondary)">
-          Data Portability
-        </p>
+    <div className="space-y-6">
+      <section className="surface-card overflow-hidden rounded-md px-5 py-6 sm:px-6 sm:py-8">
+        <p className="font-label text-[11px] text-[var(--color-secondary)]">Data Portability</p>
         <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-(--color-primary)">
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-primary)] sm:text-3xl">
               Export your finance tables to CSV
             </h1>
-            <p className="text-sm text-(--color-secondary) sm:text-base">
+            <p className="text-sm text-[var(--color-secondary)] sm:text-base">
               Download transactions with a chosen date range, or export accounts, categories,
               and labels as standalone CSV files ready for Excel.
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div className="rounded-2xl border border-(--color-border) bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] uppercase tracking-[0.18em] text-(--color-secondary)">
-                Transactions
-              </p>
-              <p className="mt-2 text-xl font-semibold text-(--color-primary)">
+            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
+              <p className="font-label text-[10px] text-[var(--color-secondary)]">Transactions</p>
+              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.transactions}
               </p>
             </div>
-            <div className="rounded-2xl border border-(--color-border) bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] uppercase tracking-[0.18em] text-(--color-secondary)">
-                Accounts
-              </p>
-              <p className="mt-2 text-xl font-semibold text-(--color-primary)">
+            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
+              <p className="font-label text-[10px] text-[var(--color-secondary)]">Accounts</p>
+              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.accounts}
               </p>
             </div>
-            <div className="rounded-2xl border border-(--color-border) bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] uppercase tracking-[0.18em] text-(--color-secondary)">
-                Categories
-              </p>
-              <p className="mt-2 text-xl font-semibold text-(--color-primary)">
+            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
+              <p className="font-label text-[10px] text-[var(--color-secondary)]">Categories</p>
+              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.categories}
               </p>
             </div>
-            <div className="rounded-2xl border border-(--color-border) bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] uppercase tracking-[0.18em] text-(--color-secondary)">
-                Labels
-              </p>
-              <p className="mt-2 text-xl font-semibold text-(--color-primary)">
+            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
+              <p className="font-label text-[10px] text-[var(--color-secondary)]">Labels</p>
+              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.labels}
               </p>
             </div>
@@ -496,26 +481,26 @@ export default function ExportPage() {
       </section>
 
       {summaryError && (
-        <Card className="border border-red-200 bg-red-50 text-sm text-red-700">
+        <div className="notice notice-danger">
           Could not load export summary: {summaryError}
-        </Card>
+        </div>
       )}
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="space-y-6 rounded-[28px] border border-(--color-border) bg-white p-6 shadow-[0_18px_40px_rgba(26,28,30,0.05)]">
+        <Card className="space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(184,66,46,0.12)] text-(--color-tertiary)">
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(184,66,46,0.12)] text-[var(--color-tertiary)]">
                 <CalendarRange className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-label text-[11px] uppercase tracking-[0.18em] text-(--color-secondary)">
+                <p className="font-label text-[11px] text-[var(--color-secondary)]">
                   Transactions CSV
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-(--color-primary)">
+                <h2 className="mt-2 text-xl font-semibold tracking-tight text-[var(--color-primary)] sm:text-2xl">
                   Export by date range
                 </h2>
-                <p className="mt-1 max-w-xl text-sm text-(--color-secondary)">
+                <p className="mt-1 max-w-xl text-sm text-[var(--color-secondary)]">
                   The default range starts at the most recent transaction date found in the
                   ledger and ends today. The CSV includes raw transaction columns plus account,
                   category, destination account, and label names.
@@ -540,7 +525,7 @@ export default function ExportPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="font-label mb-2 block text-[11px] uppercase tracking-[0.16em] text-(--color-secondary)">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                 From
               </label>
               <input
@@ -552,7 +537,7 @@ export default function ExportPage() {
               />
             </div>
             <div>
-              <label className="font-label mb-2 block text-[11px] uppercase tracking-[0.16em] text-(--color-secondary)">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
                 To
               </label>
               <input
@@ -574,20 +559,20 @@ export default function ExportPage() {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="space-y-4 rounded-[28px] border border-(--color-border) bg-white p-6 shadow-[0_18px_40px_rgba(26,28,30,0.05)]">
+          <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(26,28,30,0.06)] text-(--color-primary)">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
                   <Wallet className="h-5 w-5" />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-(--color-primary)">
+                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
                   Accounts
                 </h2>
-                <p className="mt-1 text-sm text-(--color-secondary)">
+                <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `accounts` table with balances, currencies, and account metadata.
                 </p>
               </div>
-              <span className="rounded-full border border-(--color-border) px-3 py-1 text-xs font-medium text-(--color-secondary)">
+              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
                 {summaryLoading ? "..." : `${counts.accounts} rows`}
               </span>
             </div>
@@ -611,20 +596,20 @@ export default function ExportPage() {
             )}
           </Card>
 
-          <Card className="space-y-4 rounded-[28px] border border-(--color-border) bg-white p-6 shadow-[0_18px_40px_rgba(26,28,30,0.05)]">
+          <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(26,28,30,0.06)] text-(--color-primary)">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
                   <FolderOpen className="h-5 w-5" />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-(--color-primary)">
+                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
                   Categories
                 </h2>
-                <p className="mt-1 text-sm text-(--color-secondary)">
+                <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `categories` table ordered by type and name.
                 </p>
               </div>
-              <span className="rounded-full border border-(--color-border) px-3 py-1 text-xs font-medium text-(--color-secondary)">
+              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
                 {summaryLoading ? "..." : `${counts.categories} rows`}
               </span>
             </div>
@@ -650,20 +635,20 @@ export default function ExportPage() {
             )}
           </Card>
 
-          <Card className="space-y-4 rounded-[28px] border border-(--color-border) bg-white p-6 shadow-[0_18px_40px_rgba(26,28,30,0.05)]">
+          <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(26,28,30,0.06)] text-(--color-primary)">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
                   <Tag className="h-5 w-5" />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-(--color-primary)">
+                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
                   Labels
                 </h2>
-                <p className="mt-1 text-sm text-(--color-secondary)">
+                <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `labels` table with colors and creation timestamps.
                 </p>
               </div>
-              <span className="rounded-full border border-(--color-border) px-3 py-1 text-xs font-medium text-(--color-secondary)">
+              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
                 {summaryLoading ? "..." : `${counts.labels} rows`}
               </span>
             </div>

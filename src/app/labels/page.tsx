@@ -9,9 +9,9 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Label } from "@/lib/database.types";
 
 const COLORS = [
-  "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",
-  "#14b8a6", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6",
-  "#a855f7", "#ec4899", "#64748b",
+  "#1A1C1E", "#6C7278", "#B8422E", "#3F6B4E", "#A86E2A",
+  "#3A4F66", "#8C5A3C", "#4F4A45", "#7A8C7E", "#5C2E1F",
+  "#94704A", "#2E3B4E", "#6B5944",
 ];
 
 export default function LabelsPage() {
@@ -23,7 +23,7 @@ export default function LabelsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [pageError, setPageError] = useState("");
-  const [form, setForm] = useState({ name: "", color: "#8b5cf6" });
+  const [form, setForm] = useState({ name: "", color: COLORS[5] });
 
   async function loadLabels() {
     setLoading(true);
@@ -49,7 +49,7 @@ export default function LabelsPage() {
   function openCreate() {
     setEditing(null);
     setFormError("");
-    setForm({ name: "", color: "#8b5cf6" });
+    setForm({ name: "", color: COLORS[5] });
     setModalOpen(true);
   }
 
@@ -187,53 +187,53 @@ export default function LabelsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pt-12 lg:pt-0">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Labels</h1>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-label text-[11px] text-[var(--color-secondary)]">Tags</p>
+          <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">Labels</h1>
+        </div>
+        <button onClick={openCreate} className="btn btn-primary">
           <Plus size={16} />
           Add Label
         </button>
       </div>
 
-      {pageError && (
-        <Card>
-          <div className="text-sm text-red-700">{pageError}</div>
-        </Card>
-      )}
+      {pageError && <div className="notice notice-danger">{pageError}</div>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {labels.map((label) => (
-          <Card key={label.id}>
+          <Card key={label.id} className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-4 w-4 rounded-full" style={{ backgroundColor: label.color }} />
-                <div>
-                  <span className="font-medium text-gray-900">{label.name}</span>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="h-4 w-4 flex-none rounded-full" style={{ backgroundColor: label.color }} />
+                <div className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-[var(--color-primary)]">
+                    {label.name}
+                  </span>
                   {label.user_id === null && (
-                    <p className="text-xs text-gray-500">Default label</p>
+                    <p className="text-xs text-[var(--color-secondary)]">Default label</p>
                   )}
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex flex-none gap-1">
                 <button
                   onClick={() => openEdit(label)}
-                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="Edit label"
+                  className="btn btn-ghost px-2 py-1.5"
                 >
                   <Pencil size={14} />
                 </button>
                 <button
                   onClick={() => handleDelete(label.id)}
-                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  aria-label="Delete label"
+                  className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -245,54 +245,55 @@ export default function LabelsPage() {
 
       {labels.length === 0 && (
         <Card>
-          <div className="py-12 text-center text-gray-500">No labels yet. Create your first one!</div>
+          <div className="py-12 text-center text-sm text-[var(--color-secondary)]">
+            No labels yet. Create your first one!
+          </div>
         </Card>
       )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Label" : "New Label"}>
         <form onSubmit={handleSave} className="space-y-4">
           {editing?.user_id === null && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="notice notice-warning">
               This is a shared default label. Saving will create your own copy and reassign your
               transaction label links to it.
             </div>
           )}
 
-          {formError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {formError}
-            </div>
-          )}
+          {formError && <div className="notice notice-danger">{formError}</div>}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Name</label>
             <input
               type="text"
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="field"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
+            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Color</label>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setForm({ ...form, color: c })}
-                  className={`h-6 w-6 rounded-full border-2 ${form.color === c ? "border-gray-900" : "border-transparent"}`}
+                  className={`h-7 w-7 rounded-full border-2 transition ${
+                    form.color === c ? "border-[var(--color-primary)]" : "border-transparent"
+                  }`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
               ))}
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
               Cancel
             </button>
-            <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={saving} className="btn btn-primary">
               {editing ? "Update" : "Create"}
             </button>
           </div>
