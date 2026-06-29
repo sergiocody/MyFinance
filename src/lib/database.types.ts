@@ -1,3 +1,11 @@
+export type SplitChildPayload = {
+  category_id?: string | null;
+  amount: number;
+  description?: string | null;
+  notes?: string | null;
+  label_ids?: string[];
+};
+
 export type Database = {
   public: {
     Functions: {
@@ -36,6 +44,17 @@ export type Database = {
           p_connection_id: string;
           p_iban: string;
         };
+        Returns: undefined;
+      };
+      split_transaction: {
+        Args: {
+          p_parent_id: string;
+          p_children: SplitChildPayload[];
+        };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"][];
+      };
+      unsplit_transaction: {
+        Args: { p_parent_id: string };
         Returns: undefined;
       };
       set_bank_connection_error: {
@@ -257,6 +276,8 @@ export type Database = {
           import_id: string | null;
           source: "manual" | "sync";
           external_id: string | null;
+          parent_transaction_id: string | null;
+          is_split: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -275,6 +296,8 @@ export type Database = {
           import_id?: string | null;
           source?: "manual" | "sync";
           external_id?: string | null;
+          parent_transaction_id?: string | null;
+          is_split?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -292,6 +315,8 @@ export type Database = {
           import_id?: string | null;
           source?: "manual" | "sync";
           external_id?: string | null;
+          parent_transaction_id?: string | null;
+          is_split?: boolean;
         };
         Relationships: [
           {

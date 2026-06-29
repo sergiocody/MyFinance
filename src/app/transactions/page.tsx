@@ -6,12 +6,14 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import { LabelMultiSelect } from "@/components/LabelMultiSelect";
 import Modal from "@/components/Modal";
+import { SplitModal } from "@/components/SplitModal";
 import { createTransactionHash, formatCurrency, formatDate } from "@/lib/utils";
 import {
   ArrowDownLeft,
   ArrowRightLeft,
   ArrowUpRight,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Check,
@@ -21,6 +23,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Split,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -235,6 +238,9 @@ export default function TransactionsPage() {
   const [mobileFilterPicker, setMobileFilterPicker] = useState<MobileFilterPicker>(null);
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [splitTarget, setSplitTarget] = useState<TransactionWithRelations | null>(null);
+  const [splitChildren, setSplitChildren] = useState<Record<string, TransactionWithRelations[]>>({});
+  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
 
   const [filterAccount, setFilterAccount] = useState(accountParam);
   const [filterCategory, setFilterCategory] = useState(categoryParam);
@@ -268,6 +274,7 @@ export default function TransactionsPage() {
         "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), destination_account:accounts!transactions_transfer_to_account_id_fkey(*), transaction_labels(labels(*))",
         { count: "exact" }
       )
+      .is("parent_transaction_id", null)
       .order("date", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
@@ -498,6 +505,37 @@ export default function TransactionsPage() {
   async function handleDelete(id: string) {
     if (!confirm("Delete this transaction?")) return;
     await supabase.from("transactions").delete().eq("id", id);
+    loadTransactions();
+  }
+
+  function openSplit(tx: TransactionWithRelations) {
+    setSplitTarget(tx);
+  }
+
+  const loadChildren = useCallback(async (parentId: string) => {
+    const { data } = await supabase
+      .from("transactions")
+      .select(
+        "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), destination_account:accounts!transactions_transfer_to_account_id_fkey(*), transaction_labels(labels(*))"
+      )
+      .eq("parent_transaction_id", parentId)
+      .order("created_at", { ascending: true });
+    if (data) {
+      setSplitChildren((prev) => ({ ...prev, [parentId]: data as unknown as TransactionWithRelations[] }));
+    }
+  }, []);
+
+  async function toggleExpand(tx: TransactionWithRelations) {
+    const next = !expandedParents[tx.id];
+    setExpandedParents((prev) => ({ ...prev, [tx.id]: next }));
+    if (next && !splitChildren[tx.id]) {
+      await loadChildren(tx.id);
+    }
+  }
+
+  function refreshAfterSplit() {
+    setSplitChildren({});
+    setExpandedParents({});
     loadTransactions();
   }
 
@@ -844,7 +882,15 @@ export default function TransactionsPage() {
                       >
                         {tx.description || "Untitled transaction"}
                       </p>
-                      <p className="mt-1 text-xs text-[var(--color-secondary)]">{formatDate(tx.date)}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <p className="text-xs text-[var(--color-secondary)]">{formatDate(tx.date)}</p>
+                        {tx.is_split && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(58,79,102,0.10)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-info)]">
+                            <Split size={10} />
+                            Split
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span
                       className={`shrink-0 text-sm font-semibold ${amountClass(
@@ -950,10 +996,15 @@ export default function TransactionsPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {tx.source !== "sync" && (
                       <button onClick={() => openDuplicate(tx)} className="btn btn-secondary text-xs">
                         Copy
+                      </button>
+                    )}
+                    {tx.type !== "transfer" && (
+                      <button onClick={() => openSplit(tx)} className="btn btn-secondary text-xs">
+                        {tx.is_split ? "Edit split" : "Split"}
                       </button>
                     )}
                     <button onClick={() => openEdit(tx)} className="btn btn-secondary text-xs">
@@ -968,6 +1019,56 @@ export default function TransactionsPage() {
                       </button>
                     )}
                   </div>
+
+                  {tx.is_split && (
+                    <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] p-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(tx)}
+                        className="flex w-full items-center justify-between text-xs font-medium text-[var(--color-primary)]"
+                      >
+                        <span>
+                          {expandedParents[tx.id]
+                            ? "Hide splits"
+                            : `Show splits${splitChildren[tx.id] ? ` (${splitChildren[tx.id].length})` : ""}`}
+                        </span>
+                        <ChevronDown
+                          size={14}
+                          className={`transition-transform ${expandedParents[tx.id] ? "" : "-rotate-90"}`}
+                        />
+                      </button>
+                      {expandedParents[tx.id] && (splitChildren[tx.id] ?? []).map((child) => (
+                        <div
+                          key={child.id}
+                          className="flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-2 text-xs"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                              style={
+                                child.categories
+                                  ? {
+                                      backgroundColor: child.categories.color + "20",
+                                      color: child.categories.color,
+                                    }
+                                  : { backgroundColor: "rgba(108,114,120,0.12)", color: "#6C7278" }
+                              }
+                            >
+                              {child.categories?.name ?? "Uncategorized"}
+                            </span>
+                            {child.description && (
+                              <span className="truncate text-[var(--color-secondary)]">
+                                {child.description}
+                              </span>
+                            )}
+                          </div>
+                          <span className="shrink-0 font-medium text-[var(--color-primary)]">
+                            {formatCurrency(Number(child.amount))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1002,23 +1103,50 @@ export default function TransactionsPage() {
                 </td>
               </tr>
             ) : (
-              transactions.map((tx) => (
+              transactions.flatMap((tx) => {
+                const isExpanded = Boolean(expandedParents[tx.id]);
+                const children = splitChildren[tx.id] ?? [];
+                const rows: React.ReactNode[] = [];
+                rows.push(
                 <tr key={tx.id} className="hover:bg-[rgba(26,28,30,0.03)]">
                   <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
                     {formatDate(tx.date)}
                   </td>
                   <td className="max-w-[180px] px-4 py-3 sm:max-w-[240px] md:max-w-[320px]">
-                    <p
-                      className="truncate font-medium text-[var(--color-primary)]"
-                      title={tx.description || "—"}
-                    >
-                      {tx.description || "—"}
-                    </p>
-                    {tx.notes && (
-                      <p className="truncate text-xs text-[var(--color-secondary)]" title={tx.notes}>
-                        {tx.notes}
-                      </p>
-                    )}
+                    <div className="flex items-start gap-2">
+                      {tx.is_split && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(tx)}
+                          aria-label={isExpanded ? "Collapse splits" : "Expand splits"}
+                          className="btn btn-ghost mt-0.5 px-1 py-0.5"
+                        >
+                          <ChevronDown
+                            size={14}
+                            className={`transition-transform ${isExpanded ? "" : "-rotate-90"}`}
+                          />
+                        </button>
+                      )}
+                      <div className="min-w-0">
+                        <p
+                          className="truncate font-medium text-[var(--color-primary)]"
+                          title={tx.description || "—"}
+                        >
+                          {tx.description || "—"}
+                        </p>
+                        {tx.is_split && (
+                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[rgba(58,79,102,0.10)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-info)]">
+                            <Split size={10} />
+                            Split
+                          </span>
+                        )}
+                        {tx.notes && (
+                          <p className="truncate text-xs text-[var(--color-secondary)]" title={tx.notes}>
+                            {tx.notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -1111,6 +1239,15 @@ export default function TransactionsPage() {
                           <Copy size={14} />
                         </button>
                       )}
+                      {tx.type !== "transfer" && (
+                        <button
+                          onClick={() => openSplit(tx)}
+                          title={tx.is_split ? "Edit split" : "Split transaction"}
+                          className="btn btn-ghost px-2 py-1.5"
+                        >
+                          <Split size={14} />
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(tx)}
                         title={tx.source === "sync" ? "Categorize" : "Edit"}
@@ -1130,7 +1267,60 @@ export default function TransactionsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+                if (tx.is_split && isExpanded) {
+                  children.forEach((child) => {
+                    rows.push(
+                      <tr key={child.id} className="bg-[rgba(26,28,30,0.02)]">
+                        <td className="px-4 py-2 text-xs text-[var(--color-secondary)]" />
+                        <td className="px-4 py-2 pl-12 text-sm text-[var(--color-primary)]" colSpan={4}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={
+                                child.categories
+                                  ? {
+                                      backgroundColor: child.categories.color + "20",
+                                      color: child.categories.color,
+                                    }
+                                  : { backgroundColor: "rgba(108,114,120,0.12)", color: "#6C7278" }
+                              }
+                            >
+                              {child.categories?.name ?? "Uncategorized"}
+                            </span>
+                            {child.description && (
+                              <span className="truncate text-xs text-[var(--color-secondary)]">
+                                {child.description}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {child.transaction_labels?.map((tl) => (
+                              <span
+                                key={tl.labels.id}
+                                className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                style={{
+                                  backgroundColor: tl.labels.color + "20",
+                                  color: tl.labels.color,
+                                }}
+                              >
+                                {tl.labels.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-medium text-[var(--color-secondary)]">
+                          {formatCurrency(Number(child.amount))}
+                        </td>
+                        <td className="px-4 py-2" />
+                      </tr>
+                    );
+                  });
+                }
+                return rows;
+              })
             )}
           </tbody>
         </table>
@@ -1470,6 +1660,16 @@ export default function TransactionsPage() {
           </div>
         </form>
       </Modal>
+
+      <SplitModal
+        key={splitTarget?.id ?? "none"}
+        open={splitTarget !== null}
+        onClose={() => setSplitTarget(null)}
+        transaction={splitTarget}
+        categories={categories}
+        labels={labels}
+        onSaved={refreshAfterSplit}
+      />
 
       <Modal
         open={mobileFilterPicker !== null}

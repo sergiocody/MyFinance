@@ -153,6 +153,7 @@ export default function Dashboard() {
     const { data: monthTx } = await supabase
       .from("transactions")
       .select("type, amount")
+      .eq("is_split", false)
       .gte("date", monthStart)
       .lte("date", monthEnd);
 
@@ -175,6 +176,7 @@ export default function Dashboard() {
       const { data: mTx } = await supabase
         .from("transactions")
         .select("type, amount")
+        .eq("is_split", false)
         .gte("date", mStart)
         .lte("date", mEnd);
 
@@ -192,6 +194,7 @@ export default function Dashboard() {
       .from("transactions")
       .select("amount, categories(id, name, color)")
       .eq("type", "expense")
+      .eq("is_split", false)
       .gte("date", monthStart)
       .lte("date", monthEnd);
 
