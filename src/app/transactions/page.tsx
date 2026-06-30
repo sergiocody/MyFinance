@@ -250,6 +250,16 @@ export default function TransactionsPage() {
   const [showFilters, setShowFilters] = useState(
     Boolean(accountParam || categoryParam || typeParam || fromParam || toParam)
   );
+
+  useEffect(() => {
+    setFilterAccount(accountParam);
+    setFilterCategory(categoryParam);
+    setFilterType(typeParam);
+    setFilterDateFrom(fromParam);
+    setFilterDateTo(toParam);
+    setShowFilters(Boolean(accountParam || categoryParam || typeParam || fromParam || toParam));
+    setPage(0);
+  }, [accountParam, categoryParam, typeParam, fromParam, toParam]);
   const [formError, setFormError] = useState("");
   const [loadError, setLoadError] = useState("");
 
