@@ -566,6 +566,7 @@ export default function AccountsPage() {
   }
 
   function openTransactionsForAccount(accountId: string) {
+    console.log("[nav] openTransactionsForAccount", accountId);
     router.push(`/transactions?account=${accountId}`);
   }
 
@@ -707,7 +708,7 @@ export default function AccountsPage() {
             key={account.id}
             role="link"
             tabIndex={0}
-            onClick={() => openTransactionsForAccount(account.id)}
+            onClick={() => { console.log("[card click]", account.id, account.name); openTransactionsForAccount(account.id); }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
