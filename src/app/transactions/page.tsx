@@ -250,6 +250,7 @@ export default function TransactionsPage() {
   const [showFilters, setShowFilters] = useState(
     Boolean(accountParam || categoryParam || typeParam || fromParam || toParam)
   );
+  const [showBalances, setShowBalances] = useState(false);
 
   useEffect(() => {
     setFilterAccount(accountParam);
@@ -317,19 +318,20 @@ export default function TransactionsPage() {
     loadTransactions();
   }, [loadTransactions]);
 
-  useEffect(() => {
-    async function loadRefs() {
-      const [{ data: accts }, { data: cats }, { data: lbls }] = await Promise.all([
-        supabase.from("accounts").select("*").order("name"),
-        supabase.from("categories").select("*").order("name"),
-        supabase.from("labels").select("*").order("name"),
-      ]);
-      if (accts) setAccounts(accts);
-      if (cats) setCategories(cats);
-      if (lbls) setLabels(lbls);
-    }
-    loadRefs();
+  const loadRefs = useCallback(async () => {
+    const [{ data: accts }, { data: cats }, { data: lbls }] = await Promise.all([
+      supabase.from("accounts").select("*").order("name"),
+      supabase.from("categories").select("*").order("name"),
+      supabase.from("labels").select("*").order("name"),
+    ]);
+    if (accts) setAccounts(accts);
+    if (cats) setCategories(cats);
+    if (lbls) setLabels(lbls);
   }, []);
+
+  useEffect(() => {
+    void loadRefs();
+  }, [loadRefs]);
 
   useEffect(() => {
     if (!shouldOpenComposer || modalOpen || accounts.length === 0) {
@@ -448,6 +450,7 @@ export default function TransactionsPage() {
 
       setModalOpen(false);
       loadTransactions();
+      void loadRefs();
       return;
     }
 
@@ -510,12 +513,14 @@ export default function TransactionsPage() {
 
     setModalOpen(false);
     loadTransactions();
+    void loadRefs();
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this transaction?")) return;
     await supabase.from("transactions").delete().eq("id", id);
     loadTransactions();
+    void loadRefs();
   }
 
   function openSplit(tx: TransactionWithRelations) {
@@ -547,6 +552,7 @@ export default function TransactionsPage() {
     setSplitChildren({});
     setExpandedParents({});
     loadTransactions();
+    void loadRefs();
   }
 
   const [categorizing, setCategorizing] = useState(false);
@@ -701,6 +707,10 @@ export default function TransactionsPage() {
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          <button onClick={() => setShowBalances(!showBalances)} className="btn btn-secondary">
+            <Landmark size={16} />
+            Balances
           </button>
           <button
             onClick={handleAutoCategorize}
@@ -861,6 +871,43 @@ export default function TransactionsPage() {
                 className="field"
               />
             </div>
+          </div>
+        </Card>
+      )}
+
+      {showBalances && (
+        <Card className="space-y-4">
+          <div>
+            <p className="font-label text-[11px] text-[var(--color-secondary)]">Overview</p>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--color-primary)]">Account Balances</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {accounts.map((account) => {
+              const childrenBalanceSum = accounts
+                .filter((a) => a.parent_account_id === account.id)
+                .reduce((sum, a) => sum + Number(a.current_balance), 0);
+              const hasChildren = accounts.some((a) => a.parent_account_id === account.id);
+              const displayBalance = hasChildren
+                ? Number(account.current_balance) - childrenBalanceSum
+                : Number(account.current_balance);
+              return (
+                <div
+                  key={account.id}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5"
+                >
+                  <p className="truncate text-xs text-[var(--color-secondary)]" title={account.name}>
+                    {account.name}
+                  </p>
+                  <p
+                    className={`mt-1 text-sm font-semibold ${
+                      displayBalance >= 0 ? "text-[var(--color-primary)]" : "amount-neg"
+                    }`}
+                  >
+                    {formatCurrency(displayBalance, account.currency)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
