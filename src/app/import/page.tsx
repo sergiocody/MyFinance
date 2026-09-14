@@ -30,7 +30,7 @@ const parserOptions: Record<
   },
   "ollama-gemma": {
     label: "Ollama Gemma",
-    description: "Uses your local Ollama model at http://localhost:11434 (default: gemma3:4b).",
+    description: "Uses your local Ollama model at http://localhost:11434 (default: gemma4:latest).",
   },
   "ollama-qwen": {
     label: "Ollama Qwen",
@@ -731,7 +731,7 @@ export default function ImportPage() {
                 className="field max-w-sm"
               >
                 <option value="gemini">Gemini</option>
-                <option value="ollama-gemma">Ollama Gemma (gemma3:4b)</option>
+                <option value="ollama-gemma">Ollama Gemma (gemma4:latest)</option>
                 <option value="ollama-qwen">Ollama Qwen (qwen3:8b)</option>
               </select>
               <p className="mt-1 text-xs text-[var(--color-secondary)]">

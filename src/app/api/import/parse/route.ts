@@ -69,7 +69,7 @@ type ParseRequestBody = {
 };
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
-const OLLAMA_GEMMA_MODEL = process.env.OLLAMA_GEMMA_MODEL ?? process.env.OLLAMA_MODEL ?? "gemma3:4b";
+const OLLAMA_GEMMA_MODEL = process.env.OLLAMA_GEMMA_MODEL ?? process.env.OLLAMA_MODEL ?? "gemma4:latest";
 const OLLAMA_QWEN_MODEL = process.env.OLLAMA_QWEN_MODEL ?? "qwen3:8b";
 
 const allowedAuthEmails = parseConfigList(process.env.ALLOWED_AUTH_EMAILS);

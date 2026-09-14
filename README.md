@@ -56,7 +56,7 @@ Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API k
 If you prefer local parsing, run Ollama locally with Gemma or Qwen, for example:
 
 ```bash
-ollama pull gemma3:4b
+ollama pull gemma4:latest
 ollama pull qwen3:8b
 ollama serve
 ```
@@ -65,7 +65,7 @@ The import page lets you choose between `Gemini`, `Ollama Gemma`, and `Ollama Qw
 By default the app calls:
 
 - `http://127.0.0.1:11434/api/generate`
-- model `gemma3:4b` for Gemma
+- model `gemma4:latest` for Gemma
 - model `qwen3:8b` for Qwen
 
 ### 4. Configure Environment
@@ -84,8 +84,8 @@ Environment variables:
 - `ALLOWED_ORIGINS=http://localhost:3000,https://your-app.vercel.app` to reject requests from unexpected origins
 - `GEMINI_API_KEY` for Gemini imports
 - `OLLAMA_BASE_URL` optional, defaults to `http://127.0.0.1:11434`
-- `OLLAMA_MODEL` optional legacy fallback for Gemma, defaults to `gemma3:4b`
-- `OLLAMA_GEMMA_MODEL` optional, defaults to `gemma3:4b`
+- `OLLAMA_MODEL` optional legacy fallback for Gemma, defaults to `gemma4:latest`
+- `OLLAMA_GEMMA_MODEL` optional, defaults to `gemma4:latest`
 - `OLLAMA_QWEN_MODEL` optional, defaults to `qwen3:8b`
 
 ### 5. Install and Run
