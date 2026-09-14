@@ -18,7 +18,7 @@ import type { Account, Category, Label } from "@/lib/database.types";
 
 type TransferRole = "source" | "destination";
 
-type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen";
+type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen" | "raw";
 
 const parserOptions: Record<
   ParserProvider,
@@ -35,6 +35,10 @@ const parserOptions: Record<
   "ollama-qwen": {
     label: "Ollama Qwen",
     description: "Uses your local Ollama model at http://localhost:11434 (default: qwen3:8b).",
+  },
+  raw: {
+    label: "No AI (import as-is)",
+    description: "Skips any AI model. Detects date/amount columns with fixed rules and imports the rows as they are, without smart categorization.",
   },
 };
 
@@ -733,6 +737,7 @@ export default function ImportPage() {
                 <option value="gemini">Gemini</option>
                 <option value="ollama-gemma">Ollama Gemma (gemma4:latest)</option>
                 <option value="ollama-qwen">Ollama Qwen (qwen3:8b)</option>
+                <option value="raw">No AI (import as-is)</option>
               </select>
               <p className="mt-1 text-xs text-[var(--color-secondary)]">
                 {parserOptions[parserProvider].description}

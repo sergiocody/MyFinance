@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI, GoogleGenerativeAIError, SchemaType, type Schema } from "@google/generative-ai";
 import Papa from "papaparse";
 
-type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen";
+type ParserProvider = "gemini" | "ollama-gemma" | "ollama-qwen" | "raw";
 type RequestedParserProvider = ParserProvider | "ollama";
 
 type CategoryOption = {
@@ -148,11 +148,15 @@ function isAllowedValue(value: string | null | undefined, allowedValues: Set<str
   return allowedValues.has(value.trim().toLowerCase());
 }
 
-function isOllamaProvider(provider: ParserProvider): provider is Exclude<ParserProvider, "gemini"> {
-  return provider !== "gemini";
+function isOllamaProvider(provider: ParserProvider): provider is "ollama-gemma" | "ollama-qwen" {
+  return provider === "ollama-gemma" || provider === "ollama-qwen";
 }
 
 function normalizeProvider(provider: RequestedParserProvider | undefined): ParserProvider {
+  if (provider === "raw") {
+    return "raw";
+  }
+
   if (provider === "ollama-qwen") {
     return "ollama-qwen";
   }
@@ -173,10 +177,14 @@ function getProviderLabel(provider: ParserProvider) {
     return "Ollama Qwen";
   }
 
+  if (provider === "raw") {
+    return "No AI (raw import)";
+  }
+
   return "Gemini";
 }
 
-function getOllamaModel(provider: Exclude<ParserProvider, "gemini">) {
+function getOllamaModel(provider: "ollama-gemma" | "ollama-qwen") {
   return provider === "ollama-qwen" ? OLLAMA_QWEN_MODEL : OLLAMA_GEMMA_MODEL;
 }
 
@@ -914,7 +922,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "GEMINI_API_KEY is missing on the server. Switch to Ollama Gemma or Ollama Qwen, or configure Gemini.",
+            "GEMINI_API_KEY is missing on the server. Switch to Ollama Gemma, Ollama Qwen, or No AI import, or configure Gemini.",
         },
         { status: 500 }
       );
@@ -945,6 +953,27 @@ export async function POST(request: NextRequest) {
         { error: "The CSV file does not contain any data rows." },
         { status: 400 }
       );
+    }
+
+    if (provider === "raw") {
+      const rawTransactions = enrichTransactions(
+        parseTransactionsDeterministically(header, dataRows, categories ?? [], labels ?? [], accounts ?? []),
+        categories ?? [],
+        labels ?? [],
+        accounts ?? []
+      );
+
+      if (rawTransactions.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Could not detect any transactions in this file without AI. Check that it has recognizable date and amount columns, or switch to Gemini/Ollama.",
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({ transactions: rawTransactions });
     }
 
     const prompt = buildPrompt(
