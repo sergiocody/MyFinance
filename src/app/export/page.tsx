@@ -5,6 +5,8 @@ import Papa from "papaparse";
 import { Card } from "@/components/Card";
 import { supabase } from "@/lib/supabase";
 import type { Account, Category, Label, Transaction } from "@/lib/database.types";
+
+type AccountOption = Pick<Account, "id" | "name">;
 import {
   CalendarRange,
   Download,
@@ -154,6 +156,8 @@ export default function ExportPage() {
   const [today, setToday] = useState("");
   const [transactionDateFrom, setTransactionDateFrom] = useState("");
   const [transactionDateTo, setTransactionDateTo] = useState("");
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([]);
+  const [transactionAccountId, setTransactionAccountId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -163,17 +167,23 @@ export default function ExportPage() {
       setSummaryError("");
 
       const currentDate = getTodayDate();
-      const [transactionsResponse, accountsResponse, categoriesResponse, labelsResponse] =
-        await Promise.all([
-          supabase
-            .from("transactions")
-            .select("date", { count: "exact" })
-            .order("date", { ascending: false })
-            .limit(1),
-          supabase.from("accounts").select("id", { count: "exact", head: true }),
-          supabase.from("categories").select("id", { count: "exact", head: true }),
-          supabase.from("labels").select("id", { count: "exact", head: true }),
-        ]);
+      const [
+        transactionsResponse,
+        accountsResponse,
+        categoriesResponse,
+        labelsResponse,
+        accountOptionsResponse,
+      ] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("date", { count: "exact" })
+          .order("date", { ascending: false })
+          .limit(1),
+        supabase.from("accounts").select("id", { count: "exact", head: true }),
+        supabase.from("categories").select("id", { count: "exact", head: true }),
+        supabase.from("labels").select("id", { count: "exact", head: true }),
+        supabase.from("accounts").select("id, name").order("name"),
+      ]);
 
       if (cancelled) {
         return;
@@ -183,7 +193,8 @@ export default function ExportPage() {
         transactionsResponse.error ??
         accountsResponse.error ??
         categoriesResponse.error ??
-        labelsResponse.error;
+        labelsResponse.error ??
+        accountOptionsResponse.error;
 
       if (firstError) {
         setSummaryError(firstError.message);
@@ -200,6 +211,7 @@ export default function ExportPage() {
         categories: categoriesResponse.count ?? 0,
         labels: labelsResponse.count ?? 0,
       });
+      setAccountOptions(accountOptionsResponse.data ?? []);
       setSummaryLoading(false);
     }
 
@@ -237,7 +249,7 @@ export default function ExportPage() {
 
     try {
       const transactions = await fetchPaginated<TransactionExportRecord>(async (from, to) => {
-        const query = supabase
+        let query = supabase
           .from("transactions")
           .select(
             "*, categories(name), accounts:accounts!transactions_account_id_fkey(name), destination_account:accounts!transactions_transfer_to_account_id_fkey(name), transaction_labels(labels(name))"
@@ -246,6 +258,10 @@ export default function ExportPage() {
           .lte("date", transactionDateTo)
           .order("date", { ascending: false })
           .range(from, to);
+
+        if (transactionAccountId) {
+          query = query.eq("account_id", transactionAccountId);
+        }
 
         const { data, error } = await query;
 
@@ -300,7 +316,9 @@ export default function ExportPage() {
       }));
 
       downloadCsv(
-        `transactions-${transactionDateFrom}-to-${transactionDateTo}.csv`,
+        transactionAccountId
+          ? `transactions-${accountOptions.find((account) => account.id === transactionAccountId)?.name ?? "account"}-${transactionDateFrom}-to-${transactionDateTo}.csv`
+          : `transactions-${transactionDateFrom}-to-${transactionDateTo}.csv`,
         columns,
         rows
       );
@@ -548,6 +566,23 @@ export default function ExportPage() {
                 onChange={(event) => setTransactionDateTo(event.target.value)}
                 className={inputClassName}
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                Account
+              </label>
+              <select
+                value={transactionAccountId}
+                onChange={(event) => setTransactionAccountId(event.target.value)}
+                className={inputClassName}
+              >
+                <option value="">All accounts</option>
+                {accountOptions.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
