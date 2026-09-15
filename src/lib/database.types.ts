@@ -52,6 +52,7 @@ export type Database = {
           connection_id: string;
           account_id: string;
           iban: string | null;
+          currency: string | null;
           external_account_uid: string | null;
           institution_name: string | null;
           status: string;

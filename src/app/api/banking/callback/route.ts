@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
 
     const normalizeIban = (value?: string | null) =>
       (value || "").replace(/\s+/g, "").toUpperCase();
+    const normalizeCurrency = (value?: string | null) =>
+      (value || "").trim().toUpperCase();
 
     // A reconnect is any account that was already linked before (it has an external UID or a
     // non-fresh status). Those must ALWAYS end up linked again — never sent to the selection
@@ -120,7 +122,8 @@ export async function GET(request: NextRequest) {
     };
 
     // 1) Match each account the session returned to an existing connection by IBAN and refresh
-    //    them all. This is what lets one reconnect update every sibling account at once.
+    //    them all. IBANs are globally unique, so this is always safe and is what lets one
+    //    reconnect update every sibling account at once.
     for (let i = unmatchedAccounts.length - 1; i >= 0; i--) {
       const bankAccount = unmatchedAccounts[i];
       const iban = normalizeIban(bankAccount.account_id?.iban);
@@ -132,16 +135,43 @@ export async function GET(request: NextRequest) {
       unmatchedAccounts.splice(i, 1);
     }
 
-    // 2) Guarantee the account the user actually clicked ends up linked, even if its IBAN was
-    //    not stored yet (best-effort: take the first account the session hasn't consumed).
+    // 2) Match remaining accounts by currency, but ONLY within the same institution and ONLY
+    //    when it is unambiguous (exactly one still-unmatched connection and one still-unmatched
+    //    session account share that currency). This safely re-links multi-currency accounts that
+    //    have no stored IBAN yet (e.g. Revolut EUR vs GBP) WITHOUT ever guessing by position —
+    //    guessing by order is what previously cross-linked accounts and mixed their balances.
+    const anchorInstitution = connection.institution_name ?? null;
+    for (let i = unmatchedAccounts.length - 1; i >= 0; i--) {
+      const bankAccount = unmatchedAccounts[i];
+      const currency = normalizeCurrency(bankAccount.currency);
+      if (!currency) continue;
+
+      const candidateConnections = (siblings ?? []).filter(
+        (s) =>
+          !matchedConnectionIds.has(s.connection_id) &&
+          (s.institution_name ?? null) === anchorInstitution &&
+          normalizeCurrency(s.currency) === currency
+      );
+      const accountsWithCurrency = unmatchedAccounts.filter(
+        (a) => normalizeCurrency(a.currency) === currency
+      );
+
+      if (candidateConnections.length === 1 && accountsWithCurrency.length === 1) {
+        await linkConnection(candidateConnections[0].connection_id, bankAccount);
+        unmatchedAccounts.splice(i, 1);
+      }
+    }
+
+    // 3) Last-resort guaranteed link ONLY for the unambiguous single-account case: the session
+    //    returned exactly one account and the connection the user clicked is still unmatched.
+    //    There is nothing to confuse it with, so linking is safe. We never do this when several
+    //    accounts remain, to avoid positional mislinking.
     if (
       !matchedConnectionIds.has(connection.id) &&
-      (isReconnect || session.accounts.length === 1)
+      session.accounts.length === 1 &&
+      unmatchedAccounts.length === 1
     ) {
-      const fallback = unmatchedAccounts.shift();
-      if (fallback) {
-        await linkConnection(connection.id, fallback);
-      }
+      await linkConnection(connection.id, unmatchedAccounts.shift()!);
     }
 
     if (matchedConnectionIds.size > 0) {
@@ -156,6 +186,18 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.redirect(
         `${appUrl}/accounts?reconnected=${matchedConnectionIds.size}&session=${session.accounts.length}&unmatched=${unmatchedAccounts.length}`
+      );
+    }
+
+    // A reconnect that matched nothing must NOT be downgraded to "pending" (that would make an
+    // already-linked account look disconnected and could re-trigger the selection flow). Leave
+    // the connection status untouched and report the mismatch so the user can fix the IBAN.
+    if (isReconnect) {
+      console.warn(
+        `[callback] reconnect matched no accounts for account=${accountId} (session_accounts=${session.accounts.length})`
+      );
+      return NextResponse.redirect(
+        `${appUrl}/accounts?reconnected=0&session=${session.accounts.length}&unmatched=${unmatchedAccounts.length}`
       );
     }
 

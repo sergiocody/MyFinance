@@ -18,6 +18,7 @@ RETURNS TABLE (
   connection_id UUID,
   account_id UUID,
   iban TEXT,
+  currency TEXT,
   external_account_uid TEXT,
   institution_name TEXT,
   status TEXT
@@ -36,6 +37,7 @@ AS $$
     bc.id AS connection_id,
     bc.account_id,
     a.iban,
+    a.currency,
     bc.external_account_uid,
     bc.institution_name,
     bc.status::text
