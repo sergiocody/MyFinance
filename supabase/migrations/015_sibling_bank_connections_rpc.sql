@@ -13,6 +13,10 @@
 -- return every connection for the user rather than filtering by institution name (which can
 -- differ slightly between the original and additionally-linked accounts).
 
+-- Drop first: the return type changed (added `currency`), and CREATE OR REPLACE cannot alter
+-- the OUT parameter row type of an existing function.
+DROP FUNCTION IF EXISTS get_sibling_bank_connections(UUID);
+
 CREATE OR REPLACE FUNCTION get_sibling_bank_connections(p_account_id UUID)
 RETURNS TABLE (
   connection_id UUID,

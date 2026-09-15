@@ -162,16 +162,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3) Last-resort guaranteed link ONLY for the unambiguous single-account case: the session
-    //    returned exactly one account and the connection the user clicked is still unmatched.
-    //    There is nothing to confuse it with, so linking is safe. We never do this when several
-    //    accounts remain, to avoid positional mislinking.
-    if (
-      !matchedConnectionIds.has(connection.id) &&
-      session.accounts.length === 1 &&
-      unmatchedAccounts.length === 1
-    ) {
-      await linkConnection(connection.id, unmatchedAccounts.shift()!);
+    // 3) Final safe 1:1 rule: if exactly one session account AND exactly one connection at this
+    //    institution are still unmatched, they can only be each other — there is nothing else to
+    //    confuse them with. This links accounts the bank returned without a usable currency/IBAN
+    //    (e.g. a Revolut GBP wallet reported with an empty currency field). It never fires when
+    //    several accounts remain, so unlike a positional guess it cannot cross-link.
+    const remainingConnections = (siblings ?? []).filter(
+      (s) =>
+        !matchedConnectionIds.has(s.connection_id) &&
+        (s.institution_name ?? null) === anchorInstitution
+    );
+    if (unmatchedAccounts.length === 1 && remainingConnections.length === 1) {
+      await linkConnection(remainingConnections[0].connection_id, unmatchedAccounts.shift()!);
     }
 
     if (matchedConnectionIds.size > 0) {
