@@ -46,18 +46,6 @@ export type Database = {
         };
         Returns: undefined;
       };
-      get_sibling_bank_connections: {
-        Args: { p_account_id: string };
-        Returns: {
-          connection_id: string;
-          account_id: string;
-          iban: string | null;
-          currency: string | null;
-          external_account_uid: string | null;
-          institution_name: string | null;
-          status: string;
-        }[];
-      };
       split_transaction: {
         Args: {
           p_parent_id: string;
