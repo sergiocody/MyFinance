@@ -59,8 +59,88 @@ export async function GET(request: NextRequest) {
     // Calculate session expiry (default 90 days from now)
     const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
+    // Refresh every already-linked account that shares this Enable Banking session.
+    // When a user re-authorizes a bank, the session usually covers all of the accounts
+    // they granted access to. We match each account returned by the session (by IBAN)
+    // against the user's existing connections at this institution and refresh them all at
+    // once, so they don't have to reconnect each account individually.
+    const normalizeIban = (value?: string | null) =>
+      (value || "").replace(/\s+/g, "").toUpperCase();
+
+    const { data: siblings } = await dbClient.rpc("get_sibling_bank_connections", {
+      p_account_id: accountId,
+    });
+
+    const connectionByIban = new Map<string, NonNullable<typeof siblings>[number]>();
+    for (const sib of siblings ?? []) {
+      const iban = normalizeIban(sib.iban);
+      if (iban) connectionByIban.set(iban, sib);
+    }
+
+    const matchedConnectionIds = new Set<string>();
+    const unmatchedAccounts = [...session.accounts];
+
+    for (let i = unmatchedAccounts.length - 1; i >= 0; i--) {
+      const bankAccount = unmatchedAccounts[i];
+      const iban = normalizeIban(bankAccount.account_id?.iban);
+      const sibling = iban ? connectionByIban.get(iban) : undefined;
+
+      if (!sibling) continue;
+
+      await dbClient.rpc("update_bank_connection_session", {
+        p_connection_id: sibling.connection_id,
+        p_external_account_uid: bankAccount.uid,
+        p_session_id: session.session_id,
+        p_session_expires_at: sessionExpiresAt,
+        p_status: "linked",
+        p_error_message: null,
+      });
+
+      if (bankAccount.account_id?.iban) {
+        await dbClient.rpc("update_connected_account_iban", {
+          p_connection_id: sibling.connection_id,
+          p_iban: bankAccount.account_id.iban,
+        });
+      }
+
+      matchedConnectionIds.add(sibling.connection_id);
+      unmatchedAccounts.splice(i, 1);
+    }
+
+    // If at least one existing account matched, we're reconnecting/refreshing known accounts.
+    if (matchedConnectionIds.size > 0) {
+      // Make sure the account that triggered the flow is linked, even if it had no stored
+      // IBAN to match against (fall back to the first account the session didn't consume).
+      if (!matchedConnectionIds.has(connection.id)) {
+        const fallback = unmatchedAccounts.shift();
+        if (fallback) {
+          await dbClient.rpc("update_bank_connection_session", {
+            p_connection_id: connection.id,
+            p_external_account_uid: fallback.uid,
+            p_session_id: session.session_id,
+            p_session_expires_at: sessionExpiresAt,
+            p_status: "linked",
+            p_error_message: null,
+          });
+
+          if (fallback.account_id?.iban) {
+            await dbClient.rpc("update_connected_account_iban", {
+              p_connection_id: connection.id,
+              p_iban: fallback.account_id.iban,
+            });
+          }
+
+          matchedConnectionIds.add(connection.id);
+        }
+      }
+
+      return NextResponse.redirect(
+        `${appUrl}/accounts?reconnected=${matchedConnectionIds.size}`
+      );
+    }
+
     if (session.accounts.length === 1) {
-      // Single account: auto-link directly
+      // Single brand-new account: auto-link directly
       const linkedAccount = session.accounts[0];
       await dbClient.rpc("update_bank_connection_session", {
         p_connection_id: connection.id,
@@ -81,7 +161,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
     }
 
-    // Multiple accounts: store session info and redirect to selection page
+    // Multiple brand-new accounts: store session info and redirect to selection page
     // We store session_id on the connection but leave it in "pending" so the user picks accounts
     await dbClient.rpc("update_bank_connection_session", {
       p_connection_id: connection.id,

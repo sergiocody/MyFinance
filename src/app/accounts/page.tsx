@@ -415,6 +415,32 @@ export default function AccountsPage() {
     void loadAccounts();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const reconnected = params.get("reconnected");
+    const connected = params.get("connected");
+    const errorParam = params.get("error");
+
+    if (reconnected) {
+      const count = Number(reconnected) || 1;
+      showToast(
+        "success",
+        count > 1
+          ? `Reconnected ${count} accounts — all are ready to sync.`
+          : "Account reconnected — ready to sync."
+      );
+    } else if (connected) {
+      showToast("success", "Account connected — ready to sync.");
+    } else if (errorParam) {
+      showToast("error", `Connection failed: ${errorParam}`);
+    }
+
+    if (reconnected || connected || errorParam) {
+      window.history.replaceState({}, "", "/accounts");
+    }
+  }, []);
+
   function openCreate() {
     setEditing(null);
     setForm({
