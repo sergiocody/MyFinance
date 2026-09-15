@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.redirect(
-        `${appUrl}/accounts?reconnected=${matchedConnectionIds.size}`
+        `${appUrl}/accounts?reconnected=${matchedConnectionIds.size}&session=${session.accounts.length}&unmatched=${unmatchedAccounts.length}`
       );
     }
 

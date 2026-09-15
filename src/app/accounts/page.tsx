@@ -423,13 +423,23 @@ export default function AccountsPage() {
     const errorParam = params.get("error");
 
     if (reconnected) {
-      const count = Number(reconnected) || 1;
-      showToast(
-        "success",
-        count > 1
-          ? `Reconnected ${count} accounts — all are ready to sync.`
-          : "Account reconnected — ready to sync."
-      );
+      const refreshed = Number(reconnected) || 0;
+      const sessionCount = Number(params.get("session")) || refreshed;
+      const unmatched = Number(params.get("unmatched")) || 0;
+
+      if (unmatched > 0) {
+        showToast(
+          "error",
+          `Reconnected ${refreshed} of ${sessionCount} account(s). ${unmatched} account(s) returned by the bank could not be matched to an existing account (missing/mismatched IBAN).`
+        );
+      } else {
+        showToast(
+          "success",
+          refreshed > 1
+            ? `Reconnected ${refreshed} accounts — all are ready to sync.`
+            : "Account reconnected — ready to sync."
+        );
+      }
     } else if (connected) {
       showToast("success", "Account connected — ready to sync.");
     } else if (errorParam) {
