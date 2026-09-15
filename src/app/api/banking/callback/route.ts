@@ -59,17 +59,33 @@ export async function GET(request: NextRequest) {
     // Calculate session expiry (default 90 days from now)
     const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Refresh every already-linked account that shares this Enable Banking session.
-    // When a user re-authorizes a bank, the session usually covers all of the accounts
-    // they granted access to. We match each account returned by the session (by IBAN)
-    // against the user's existing connections at this institution and refresh them all at
-    // once, so they don't have to reconnect each account individually.
     const normalizeIban = (value?: string | null) =>
       (value || "").replace(/\s+/g, "").toUpperCase();
 
-    const { data: siblings } = await dbClient.rpc("get_sibling_bank_connections", {
-      p_account_id: accountId,
-    });
+    // A reconnect is any account that was already linked before (it has an external UID or a
+    // non-fresh status). Those must ALWAYS end up linked again — never sent to the selection
+    // page — while a brand-new "pending" connection may still onboard multiple accounts.
+    const isReconnect =
+      Boolean(connection.external_account_uid) ||
+      connection.status === "linked" ||
+      connection.status === "expired" ||
+      connection.status === "error";
+
+    // Fetch the user's other connections at this institution so a single reconnect can refresh
+    // every account the re-authorization covered (matched by IBAN, the only stable identifier
+    // across Enable Banking sessions).
+    const { data: siblings, error: siblingsError } = await dbClient.rpc(
+      "get_sibling_bank_connections",
+      { p_account_id: accountId }
+    );
+
+    if (siblingsError) {
+      console.error("[callback] get_sibling_bank_connections failed:", siblingsError.message);
+    }
+
+    console.log(
+      `[callback] account=${accountId} isReconnect=${isReconnect} session_accounts=${session.accounts.length} siblings=${siblings?.length ?? 0}`
+    );
 
     const connectionByIban = new Map<string, NonNullable<typeof siblings>[number]>();
     for (const sib of siblings ?? []) {
@@ -80,15 +96,12 @@ export async function GET(request: NextRequest) {
     const matchedConnectionIds = new Set<string>();
     const unmatchedAccounts = [...session.accounts];
 
-    for (let i = unmatchedAccounts.length - 1; i >= 0; i--) {
-      const bankAccount = unmatchedAccounts[i];
-      const iban = normalizeIban(bankAccount.account_id?.iban);
-      const sibling = iban ? connectionByIban.get(iban) : undefined;
-
-      if (!sibling) continue;
-
+    const linkConnection = async (
+      connectionId: string,
+      bankAccount: (typeof session.accounts)[number]
+    ) => {
       await dbClient.rpc("update_bank_connection_session", {
-        p_connection_id: sibling.connection_id,
+        p_connection_id: connectionId,
         p_external_account_uid: bankAccount.uid,
         p_session_id: session.session_id,
         p_session_expires_at: sessionExpiresAt,
@@ -98,40 +111,47 @@ export async function GET(request: NextRequest) {
 
       if (bankAccount.account_id?.iban) {
         await dbClient.rpc("update_connected_account_iban", {
-          p_connection_id: sibling.connection_id,
+          p_connection_id: connectionId,
           p_iban: bankAccount.account_id.iban,
         });
       }
 
-      matchedConnectionIds.add(sibling.connection_id);
+      matchedConnectionIds.add(connectionId);
+    };
+
+    // 1) Match each account the session returned to an existing connection by IBAN and refresh
+    //    them all. This is what lets one reconnect update every sibling account at once.
+    for (let i = unmatchedAccounts.length - 1; i >= 0; i--) {
+      const bankAccount = unmatchedAccounts[i];
+      const iban = normalizeIban(bankAccount.account_id?.iban);
+      const sibling = iban ? connectionByIban.get(iban) : undefined;
+
+      if (!sibling) continue;
+
+      await linkConnection(sibling.connection_id, bankAccount);
       unmatchedAccounts.splice(i, 1);
     }
 
-    // If at least one existing account matched, we're reconnecting/refreshing known accounts.
+    // 2) Guarantee the account the user actually clicked ends up linked, even if its IBAN was
+    //    not stored yet (best-effort: take the first account the session hasn't consumed).
+    if (
+      !matchedConnectionIds.has(connection.id) &&
+      (isReconnect || session.accounts.length === 1)
+    ) {
+      const fallback = unmatchedAccounts.shift();
+      if (fallback) {
+        await linkConnection(connection.id, fallback);
+      }
+    }
+
     if (matchedConnectionIds.size > 0) {
-      // Make sure the account that triggered the flow is linked, even if it had no stored
-      // IBAN to match against (fall back to the first account the session didn't consume).
-      if (!matchedConnectionIds.has(connection.id)) {
-        const fallback = unmatchedAccounts.shift();
-        if (fallback) {
-          await dbClient.rpc("update_bank_connection_session", {
-            p_connection_id: connection.id,
-            p_external_account_uid: fallback.uid,
-            p_session_id: session.session_id,
-            p_session_expires_at: sessionExpiresAt,
-            p_status: "linked",
-            p_error_message: null,
-          });
+      console.log(
+        `[callback] linked ${matchedConnectionIds.size} connection(s) for account=${accountId}`
+      );
 
-          if (fallback.account_id?.iban) {
-            await dbClient.rpc("update_connected_account_iban", {
-              p_connection_id: connection.id,
-              p_iban: fallback.account_id.iban,
-            });
-          }
-
-          matchedConnectionIds.add(connection.id);
-        }
+      // Preserve the original wording for a genuine first-time single-account connection.
+      if (!isReconnect && session.accounts.length === 1) {
+        return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
       }
 
       return NextResponse.redirect(
@@ -139,30 +159,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (session.accounts.length === 1) {
-      // Single brand-new account: auto-link directly
-      const linkedAccount = session.accounts[0];
-      await dbClient.rpc("update_bank_connection_session", {
-        p_connection_id: connection.id,
-        p_external_account_uid: linkedAccount.uid,
-        p_session_id: session.session_id,
-        p_session_expires_at: sessionExpiresAt,
-        p_status: "linked",
-        p_error_message: null,
-      });
-
-      if (linkedAccount.account_id?.iban) {
-        await dbClient.rpc("update_connected_account_iban", {
-          p_connection_id: connection.id,
-          p_iban: linkedAccount.account_id.iban,
-        });
-      }
-
-      return NextResponse.redirect(`${appUrl}/accounts?connected=${accountId}`);
-    }
-
-    // Multiple brand-new accounts: store session info and redirect to selection page
-    // We store session_id on the connection but leave it in "pending" so the user picks accounts
+    // Brand-new connection returning multiple accounts: let the user pick which ones to track.
     await dbClient.rpc("update_bank_connection_session", {
       p_connection_id: connection.id,
       p_external_account_uid: "", // will be set after selection
@@ -172,7 +169,6 @@ export async function GET(request: NextRequest) {
       p_error_message: null,
     });
 
-    // Encode accounts info in URL for the selection page
     const bankAccounts = session.accounts.map(a => ({
       uid: a.uid,
       iban: a.account_id?.iban || "",
