@@ -289,7 +289,10 @@ export default function TransactionsPage() {
       .order("date", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    if (filterAccount) query = query.eq("account_id", filterAccount);
+    if (filterAccount)
+      query = query.or(
+        `account_id.eq.${filterAccount},transfer_to_account_id.eq.${filterAccount}`
+      );
     if (filterCategory) query = query.eq("category_id", filterCategory);
     if (filterType) query = query.eq("type", filterType);
     if (filterDateFrom) query = query.gte("date", filterDateFrom);
