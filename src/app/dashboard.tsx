@@ -20,6 +20,7 @@ import {
 import {
   BarChart,
   Bar,
+  Legend,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -49,6 +50,7 @@ function tooltipCurrency(
 interface MonthlySummary {
   month: string;
   income: number;
+  transfer: number;
   expense: number;
 }
 
@@ -185,6 +187,7 @@ export default function Dashboard() {
       months.push({
         month: format(m, "MMM"),
         income: typedMonthRows.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0),
+        transfer: typedMonthRows.filter((t) => t.type === "transfer").reduce((s, t) => s + Number(t.amount), 0),
         expense: typedMonthRows.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0),
       });
     }
@@ -364,7 +367,7 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="min-w-0">
           <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">
-            Income vs Expenses (Last 6 Months)
+            Income, Transfers & Expenses (Last 6 Months)
           </h3>
           <div className="h-56 min-w-0 sm:h-64">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -373,8 +376,10 @@ export default function Dashboard() {
                 <XAxis dataKey="month" stroke="#6C7278" />
                 <YAxis stroke="#6C7278" />
                 <Tooltip formatter={tooltipCurrency} />
-                <Bar dataKey="income" fill="#3F6B4E" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" fill="#B8422E" radius={[4, 4, 0, 0]} />
+                <Legend />
+                <Bar dataKey="income" name="Income" fill="#3F6B4E" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="transfer" name="Transfers" fill="#3A4F66" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expenses" fill="#B8422E" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
