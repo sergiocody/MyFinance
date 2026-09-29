@@ -53,30 +53,33 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top app bar */}
-      <header className="surface-card-strong fixed inset-x-0 top-0 z-30 flex h-15 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 lg:hidden" style={{ height: "60px" }}>
+      <header className="surface-card-strong fixed inset-x-0 top-0 z-30 flex h-15 items-center justify-between gap-3 border-b border-[var(--color-border)] px-2 lg:hidden">
         <button
+          type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
-          className="btn btn-ghost -ml-2 px-2 py-2"
+          aria-expanded={mobileOpen}
+          aria-controls="app-sidebar"
+          className="btn btn-ghost btn-icon"
         >
           <Menu size={20} />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Image
             src="/Myfinance.png"
             alt=""
             width={28}
             height={28}
-            className="h-7 w-7 object-contain"
+            className="h-7 w-7 flex-none object-contain"
           />
-          <div className="leading-tight">
-            <p className="font-label text-[10px] text-[var(--color-secondary)]">Heritage</p>
-            <span className="text-sm font-semibold tracking-tight text-[var(--color-primary)]">
+          <div className="min-w-0 leading-tight">
+            <p className="label-caps">Heritage</p>
+            <span className="block truncate text-sm font-semibold tracking-tight text-[var(--color-primary)]">
               {activeName}
             </span>
           </div>
         </div>
-        <div className="w-9" aria-hidden />
+        <div className="w-11 flex-none" aria-hidden />
       </header>
 
       {/* Drawer overlay */}
@@ -90,12 +93,13 @@ export default function Sidebar() {
 
       {/* Sidebar / drawer */}
       <aside
+        id="app-sidebar"
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--color-border)] bg-[rgba(247,245,242,0.96)] text-[var(--color-primary)] shadow-[24px_0_48px_rgba(26,28,30,0.06)] backdrop-blur transition-transform lg:w-64 lg:translate-x-0",
+          "fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--color-border)] bg-[rgba(247,245,242,0.96)] text-[var(--color-primary)] shadow-[24px_0_48px_rgba(26,28,30,0.06)] backdrop-blur transition-transform duration-200 ease-in-out motion-reduce:transition-none lg:w-64 lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-5 py-4 lg:h-20 lg:px-6">
+        <div className="flex items-center gap-3 border-b border-[var(--color-border)] py-4 pl-5 pr-3 lg:h-20 lg:px-6">
           <div className="flex h-9 w-9 items-center justify-center overflow-hidden">
             <Image
               src="/Myfinance.png"
@@ -105,20 +109,21 @@ export default function Sidebar() {
               className="h-9 w-9 object-contain"
             />
           </div>
-          <div className="flex-1">
-            <p className="font-label text-[10px] text-[var(--color-secondary)]">Heritage</p>
+          <div className="min-w-0 flex-1">
+            <p className="label-caps">Heritage</p>
             <span className="text-lg font-semibold tracking-tight">MyFinance</span>
           </div>
           <button
+            type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close menu"
-            className="btn btn-ghost px-2 py-2 lg:hidden"
+            className="btn btn-ghost btn-icon lg:hidden"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav aria-label="Main" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {navigation.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -128,14 +133,15 @@ export default function Sidebar() {
                 key={item.name}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                  "pressable tap-target flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
                   isActive
                     ? "bg-[var(--color-tertiary)] text-[var(--color-neutral)]"
-                    : "text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.05)] hover:text-[var(--color-primary)]"
+                    : "text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                 )}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-5 w-5 flex-none" aria-hidden />
                 {item.name}
               </Link>
             );
@@ -144,13 +150,14 @@ export default function Sidebar() {
 
         <div className="border-t border-[var(--color-border)] px-5 py-4 lg:px-6">
           <p className="truncate text-sm text-[var(--color-primary)]">{user?.email}</p>
-          <div className="mt-3 flex items-center justify-between">
-            <p className="font-label text-[10px] text-[var(--color-secondary)]">MyFinance v1.0</p>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="label-caps">MyFinance v1.0</p>
             <button
+              type="button"
               onClick={() => void signOut()}
-              className="btn btn-ghost px-2 py-1 text-xs"
+              className="btn btn-ghost btn-sm -mr-3"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-4 w-4" aria-hidden />
               Sign out
             </button>
           </div>

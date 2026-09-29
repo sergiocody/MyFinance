@@ -20,10 +20,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${publicSans.variable} ${spaceGrotesk.variable} h-full bg-[var(--color-neutral)]`}>
-        <div className="mx-auto max-w-3xl px-6 py-16">
+        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
           <a
             href="/"
-            className="font-label mb-10 block text-[11px] uppercase tracking-widest text-[var(--color-tertiary)]"
+            className="label-caps tap-target -ml-2 mb-8 inline-flex items-center rounded-sm px-2 text-[var(--color-tertiary)] transition-colors duration-150 hover:text-[var(--color-tertiary-hover)]"
           >
             ← MyFinance
           </a>

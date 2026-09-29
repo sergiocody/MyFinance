@@ -58,32 +58,34 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(184,66,46,0.12),_transparent_28%),linear-gradient(180deg,_#faf8f4_0%,_#f7f5f2_100%)] px-4 py-10">
-      <div className="surface-card-strong w-full max-w-md rounded-md p-8">
+    <div className="auth-backdrop flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="surface-card-strong w-full max-w-md rounded-md p-6 sm:p-8">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md bg-transparent">
+          <div className="flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-md bg-transparent">
             <Image src="/Myfinance.png" alt="MyFinance Logo" width={48} height={48} className="h-12 w-12 object-contain" />
           </div>
-          <div>
-            <p className="font-label text-[11px] text-[var(--color-secondary)]">Heritage Access</p>
-            <h1 className="text-2xl font-semibold text-[var(--color-primary)]">MyFinance</h1>
+          <div className="min-w-0">
+            <p className="label-caps">Heritage Access</p>
+            <h1 className="page-title">MyFinance</h1>
             <p className="text-sm text-[var(--color-secondary)]">Private finance tracking with Supabase auth</p>
           </div>
         </div>
 
         {signUpAvailable ? (
-          <div className="mb-6 grid grid-cols-2 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.04)] p-1 text-sm font-medium">
+          <div className="mb-6 grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.04)] p-1 text-sm font-medium">
             <button
               type="button"
               onClick={() => setMode("signin")}
-              className={mode === "signin" ? "rounded-sm bg-white px-3 py-2 text-[var(--color-primary)] shadow-sm" : "px-3 py-2 text-[var(--color-secondary)]"}
+              aria-pressed={mode === "signin"}
+              className={`pressable tap-target rounded-sm px-3 ${mode === "signin" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-[var(--color-secondary)] hover:text-[var(--color-primary)]"}`}
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => setMode("signup")}
-              className={mode === "signup" ? "rounded-sm bg-white px-3 py-2 text-[var(--color-primary)] shadow-sm" : "px-3 py-2 text-[var(--color-secondary)]"}
+              aria-pressed={mode === "signup"}
+              className={`pressable tap-target rounded-sm px-3 ${mode === "signup" ? "bg-white text-[var(--color-primary)] shadow-sm" : "text-[var(--color-secondary)] hover:text-[var(--color-primary)]"}`}
             >
               Create Account
             </button>
@@ -96,8 +98,9 @@ export default function AuthScreen() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Email</label>
+            <label htmlFor="auth-email" className="field-label">Email</label>
             <input
+              id="auth-email"
               type="email"
               required
               value={email}
@@ -108,8 +111,9 @@ export default function AuthScreen() {
           </div>
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Password</label>
+            <label htmlFor="auth-password" className="field-label">Password</label>
             <input
+              id="auth-password"
               type="password"
               required
               minLength={8}
@@ -122,8 +126,9 @@ export default function AuthScreen() {
 
           {isSignUpMode && (
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">Confirm Password</label>
+              <label htmlFor="auth-confirm-password" className="field-label">Confirm Password</label>
               <input
+                id="auth-confirm-password"
                 type="password"
                 required
                 minLength={8}
@@ -141,7 +146,7 @@ export default function AuthScreen() {
           <button
             type="submit"
             disabled={isPending}
-            className="btn btn-primary w-full py-3 text-sm font-semibold"
+            className="btn btn-primary w-full font-semibold"
           >
             {isPending ? "Please wait..." : isSignUpMode ? "Create Account" : "Sign In"}
           </button>

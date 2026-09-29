@@ -9,10 +9,10 @@ export default function PrivacyPage() {
 
   return (
     <article className="prose-custom">
-      <p className="font-label text-[11px] uppercase tracking-widest text-[var(--color-secondary)]">
+      <p className="label-caps">
         Legal
       </p>
-      <h1 className="mt-3 text-4xl font-semibold text-[var(--color-primary)]">
+      <h1 className="mt-3 text-3xl font-semibold text-[var(--color-primary)] sm:text-4xl">
         Privacy Policy
       </h1>
       <p className="mt-2 text-sm text-[var(--color-secondary)]">Last updated: {lastUpdated}</p>

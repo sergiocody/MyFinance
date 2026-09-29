@@ -11,9 +11,9 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   if (!hasSupabaseConfig) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="surface-card-strong max-w-lg rounded-md p-8">
-          <p className="font-label text-[11px] text-[var(--color-secondary)]">Configuration</p>
-          <h1 className="mt-3 text-2xl font-semibold text-[var(--color-primary)]">
+        <div className="surface-card-strong max-w-lg rounded-md p-6 sm:p-8">
+          <p className="label-caps">Configuration</p>
+          <h1 className="page-title mt-2">
             Supabase configuration missing
           </h1>
           <p className="mt-3 text-sm text-[var(--color-secondary)]">
@@ -27,7 +27,11 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
+        <div
+          role="status"
+          aria-label="Loading"
+          className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent"
+        />
       </div>
     );
   }

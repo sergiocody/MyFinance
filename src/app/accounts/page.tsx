@@ -17,6 +17,7 @@ import {
   WifiOff,
   CheckCircle2,
   XCircle,
+  X,
 } from "lucide-react";
 import type { Account, BankConnection } from "@/lib/database.types";
 
@@ -154,9 +155,9 @@ function AccountTrendSparkline({
 
   return (
     <div className="space-y-2">
-      <div className="font-label flex items-center justify-between text-[10px] text-[var(--color-secondary)]">
+      <div className="label-caps flex items-center justify-between gap-2">
         <span>6M Evolution</span>
-        <span>{points[0]?.label} - {points.at(-1)?.label}</span>
+        <span className="truncate">{points[0]?.label} - {points.at(-1)?.label}</span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full overflow-visible">
         <polyline points={areaPoints} fill={color} fillOpacity="0.12" stroke="none" />
@@ -180,9 +181,9 @@ function AccountTrendSparkline({
           />
         ))}
       </svg>
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-[var(--color-secondary)]">Click to view transactions</span>
-        <span className={`font-medium ${delta >= 0 ? "amount-pos" : "amount-neg"}`}>
+        <span className={`flex-none font-medium tabular-nums ${delta >= 0 ? "amount-pos" : "amount-neg"}`}>
           {delta >= 0 ? "+" : ""}
           {formatCurrency(delta)}
         </span>
@@ -289,10 +290,11 @@ function BankConnectFlow({
   return (
     <div className="space-y-4">
       <div>
-        <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+        <label htmlFor="bank-country" className="field-label">
           Country
         </label>
         <select
+          id="bank-country"
           value={country}
           onChange={(e) => {
             setCountry(e.target.value);
@@ -310,6 +312,7 @@ function BankConnectFlow({
         <input
           type="text"
           placeholder="Search banks..."
+          aria-label="Search banks"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="field"
@@ -318,22 +321,27 @@ function BankConnectFlow({
 
       {loadingInstitutions ? (
         <div className="flex justify-center py-8">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-tertiary)] border-t-transparent" />
+          <div
+            role="status"
+            aria-label="Loading banks"
+            className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-tertiary)] border-t-transparent"
+          />
         </div>
       ) : (
-        <div className="max-h-64 space-y-1 overflow-y-auto">
+        <div className="max-h-64 space-y-2 overflow-y-auto">
           {filtered.map((inst) => (
             <button
               key={inst.id}
+              type="button"
               onClick={() => handleSelectInstitution(inst)}
               disabled={connecting}
-              className="flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[rgba(26,28,30,0.04)] disabled:opacity-50"
+              className="pressable tap-target flex w-full items-center gap-3 rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm hover:border-[var(--color-border-hover)] hover:bg-[var(--color-hover)]"
             >
               {inst.logo && (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={inst.logo} alt="" className="h-6 w-6 rounded-sm object-contain" />
+                <img src={inst.logo} alt="" className="h-6 w-6 flex-none rounded-sm object-contain" />
               )}
-              <span className="font-medium text-[var(--color-primary)]">{inst.name}</span>
+              <span className="min-w-0 truncate font-medium text-[var(--color-primary)]">{inst.name}</span>
             </button>
           ))}
           {filtered.length === 0 && !loadingInstitutions && (
@@ -343,7 +351,7 @@ function BankConnectFlow({
       )}
 
       <div className="flex justify-end pt-2">
-        <button type="button" onClick={onClose} className="btn btn-secondary">
+        <button type="button" onClick={onClose} className="btn btn-secondary w-full sm:w-auto">
           Cancel
         </button>
       </div>
@@ -668,7 +676,11 @@ export default function AccountsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
+        <div
+          role="status"
+          aria-label="Loading"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent"
+        />
       </div>
     );
   }
@@ -677,48 +689,54 @@ export default function AccountsPage() {
     <div className="space-y-6">
       {toast && (
         <div
-          className={`fixed left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md px-4 py-3 lg:top-4 ${
+          role="status"
+          className={`fixed inset-x-4 top-20 z-50 mx-auto flex max-w-md items-center gap-2 py-2 pl-4 pr-2 lg:top-4 ${
             toast.type === "success" ? "notice notice-success" : "notice notice-danger"
           }`}
         >
-          {toast.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-          <span className="text-sm font-medium">{toast.message}</span>
+          {toast.type === "success" ? (
+            <CheckCircle2 size={18} className="flex-none" aria-hidden />
+          ) : (
+            <XCircle size={18} className="flex-none" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1 text-sm font-medium">{toast.message}</span>
           <button
+            type="button"
             onClick={() => setToast(null)}
-            className="ml-2 text-current/70 hover:text-current"
-            aria-label="Dismiss"
+            className="btn btn-ghost btn-icon flex-none text-current hover:text-current"
+            aria-label="Dismiss notification"
           >
-            ×
+            <X size={16} aria-hidden />
           </button>
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-label text-[11px] text-[var(--color-secondary)]">Money</p>
-          <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+          <p className="label-caps">Money</p>
+          <h1 className="page-title mt-1">
             Accounts
           </h1>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
           {accounts.some(a => a.account_mode === "automated") && (
             <button
               onClick={handleSyncAll}
               disabled={syncingAll}
               className="btn btn-secondary"
             >
-              <RefreshCw size={16} className={syncingAll ? "animate-spin" : ""} />
+              <RefreshCw size={16} className={syncingAll ? "animate-spin" : ""} aria-hidden />
               Sync All
             </button>
           )}
           <button onClick={openCreate} className="btn btn-primary">
-            <Plus size={16} />
+            <Plus size={16} aria-hidden />
             Add Account
           </button>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         {accounts.map((account) => (
           <Card
             key={account.id}
@@ -731,16 +749,16 @@ export default function AccountsPage() {
                 openTransactionsForAccount(account.id);
               }
             }}
-            className={`cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[rgba(184,66,46,0.4)] focus:ring-offset-2 ${
+            className={`cursor-pointer transition duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${
               !account.is_active ? "opacity-50" : ""
             } ${
               account.account_mode === "automated"
-                ? "!border-l-[3px] !border-l-[var(--color-tertiary)]"
+                ? "border-l-4 border-l-[var(--color-tertiary)]"
                 : ""
             }`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-3">
+            <div className="-mr-2 -mt-2 flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-3 pt-2">
                 <div
                   className="h-4 w-4 flex-none rounded-full"
                   style={{ backgroundColor: account.color }}
@@ -753,7 +771,7 @@ export default function AccountsPage() {
                   </p>
                   {account.iban && (
                     <p
-                      className="mt-0.5 max-w-[180px] truncate text-[11px] text-[var(--color-secondary)]"
+                      className="mt-1 truncate text-xs tabular-nums text-[var(--color-secondary)]"
                       title={account.iban}
                     >
                       IBAN {account.iban}
@@ -768,10 +786,10 @@ export default function AccountsPage() {
                     openEdit(account);
                   }}
                   onKeyDown={(event) => event.stopPropagation()}
-                  aria-label="Edit account"
-                  className="btn btn-ghost px-2 py-1.5"
+                  aria-label={`Edit account ${account.name}`}
+                  className="btn btn-ghost btn-icon"
                 >
-                  <Pencil size={14} />
+                  <Pencil size={16} aria-hidden />
                 </button>
                 <button
                   onClick={(event) => {
@@ -779,10 +797,10 @@ export default function AccountsPage() {
                     handleDelete(account.id);
                   }}
                   onKeyDown={(event) => event.stopPropagation()}
-                  aria-label="Delete account"
-                  className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
+                  aria-label={`Delete account ${account.name}`}
+                  className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} aria-hidden />
                 </button>
               </div>
             </div>
@@ -792,7 +810,7 @@ export default function AccountsPage() {
                 <>
                   <p className="text-xs text-[var(--color-secondary)]">Effective Balance</p>
                   <p
-                    className={`text-xl font-bold ${
+                    className={`stat-value ${
                       Number(account.current_balance) -
                         accounts
                           .filter(a => a.parent_account_id === account.id)
@@ -818,7 +836,7 @@ export default function AccountsPage() {
                 <>
                   <p className="text-xs text-[var(--color-secondary)]">Current Balance</p>
                   <p
-                    className={`text-xl font-bold ${
+                    className={`stat-value ${
                       Number(account.current_balance) >= 0
                         ? "text-[var(--color-primary)]"
                         : "amount-neg"
@@ -834,7 +852,7 @@ export default function AccountsPage() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {bankConnections[account.id]?.status === "linked" ? (
                   <>
-                    <Wifi size={12} className="text-[var(--color-success)]" />
+                    <Wifi size={12} className="text-[var(--color-success)]" aria-hidden />
                     <span className="text-xs text-[var(--color-success)]">Connected</span>
                     {bankConnections[account.id]?.last_synced_at && (
                       <span className="text-xs text-[var(--color-secondary)]">
@@ -852,10 +870,11 @@ export default function AccountsPage() {
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
                       disabled={syncing === account.id}
-                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-tertiary)]"
+                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
                     >
                       <RefreshCw
-                        size={12}
+                        size={14}
+                        aria-hidden
                         className={syncing === account.id ? "animate-spin" : ""}
                       />
                       Sync
@@ -864,7 +883,7 @@ export default function AccountsPage() {
                 ) : bankConnections[account.id]?.status === "expired" ||
                   bankConnections[account.id]?.status === "error" ? (
                   <>
-                    <WifiOff size={12} className="text-[var(--color-warning)]" />
+                    <WifiOff size={12} className="text-[var(--color-warning)]" aria-hidden />
                     <span className="text-xs text-[var(--color-warning)]">
                       {bankConnections[account.id]?.status === "expired" ? "Expired" : "Error"}
                     </span>
@@ -874,15 +893,15 @@ export default function AccountsPage() {
                         handleConnectBank(account.id);
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-warning)]"
+                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-warning)]"
                     >
-                      <Link2 size={12} />
+                      <Link2 size={14} aria-hidden />
                       Reconnect
                     </button>
                   </>
                 ) : (
                   <>
-                    <WifiOff size={12} className="text-[var(--color-secondary)]" />
+                    <WifiOff size={12} className="text-[var(--color-secondary)]" aria-hidden />
                     <span className="text-xs text-[var(--color-secondary)]">Not connected</span>
                     <button
                       onClick={(event) => {
@@ -890,9 +909,9 @@ export default function AccountsPage() {
                         handleConnectBank(account.id);
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      className="btn btn-ghost ml-auto px-2 py-1 text-xs hover:!text-[var(--color-tertiary)]"
+                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
                     >
-                      <Link2 size={12} />
+                      <Link2 size={14} aria-hidden />
                       Connect Bank
                     </button>
                   </>
@@ -914,7 +933,7 @@ export default function AccountsPage() {
                   toggleActive(account);
                 }}
                 onKeyDown={(event) => event.stopPropagation()}
-                className={`chip ${account.is_active ? "chip-success" : ""}`}
+                className={`chip pressable hit-area ${account.is_active ? "chip-success" : ""}`}
               >
                 {account.is_active ? "Active" : "Inactive"}
               </button>
@@ -941,35 +960,37 @@ export default function AccountsPage() {
         <form onSubmit={handleSave} className="space-y-4">
           {!editing && (
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <p className="field-label">
                 Account Mode
-              </label>
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, account_mode: "manual" })}
-                  className={`rounded-md border px-3 py-3 text-left text-sm font-medium transition ${
+                  aria-pressed={form.account_mode === "manual"}
+                  className={`pressable rounded-md border p-3 text-left text-sm font-medium ${
                     form.account_mode === "manual"
                       ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.08)] text-[var(--color-tertiary)]"
-                      : "border-[var(--color-border)] text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
+                      : "border-[var(--color-border-strong)] text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                   }`}
                 >
                   Manual
-                  <span className="mt-0.5 block text-xs font-normal opacity-70">
+                  <span className="mt-1 block text-xs font-normal opacity-80">
                     Cash, Investments
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, account_mode: "automated" })}
-                  className={`rounded-md border px-3 py-3 text-left text-sm font-medium transition ${
+                  aria-pressed={form.account_mode === "automated"}
+                  className={`pressable rounded-md border p-3 text-left text-sm font-medium ${
                     form.account_mode === "automated"
                       ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.08)] text-[var(--color-tertiary)]"
-                      : "border-[var(--color-border)] text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
+                      : "border-[var(--color-border-strong)] text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                   }`}
                 >
                   Automated
-                  <span className="mt-0.5 block text-xs font-normal opacity-70">
+                  <span className="mt-1 block text-xs font-normal opacity-80">
                     Bank connection
                   </span>
                 </button>
@@ -978,7 +999,7 @@ export default function AccountsPage() {
           )}
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Name
             </label>
             <input
@@ -993,7 +1014,7 @@ export default function AccountsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label className="field-label">
                 Type
               </label>
               <select
@@ -1007,7 +1028,7 @@ export default function AccountsPage() {
               </select>
             </div>
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label className="field-label">
                 Currency
               </label>
               <input
@@ -1020,7 +1041,7 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Bank Name
             </label>
             <input
@@ -1033,7 +1054,7 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               IBAN / Account number
             </label>
             <input
@@ -1043,14 +1064,14 @@ export default function AccountsPage() {
               className="field"
               placeholder="e.g., ES8001287820840104072774"
             />
-            <p className="mt-1 text-xs text-[var(--color-secondary)]">
+            <p className="mt-2 text-xs text-[var(--color-secondary)]">
               Used to detect transfers automatically during CSV imports and bank sync.
             </p>
           </div>
 
           {!editing && form.account_mode === "manual" && (
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label className="field-label">
                 Initial Balance (€)
               </label>
               <input
@@ -1064,18 +1085,17 @@ export default function AccountsPage() {
           )}
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <p className="field-label">
               Color
-            </label>
+            </p>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setForm({ ...form, color: c })}
-                  className={`h-7 w-7 rounded-full border-2 transition ${
-                    form.color === c ? "border-[var(--color-primary)]" : "border-transparent"
-                  }`}
+                  aria-pressed={form.color === c}
+                  className="swatch"
                   style={{ backgroundColor: c }}
                   aria-label={`Color ${c}`}
                 />
@@ -1084,7 +1104,7 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Account class
             </label>
             <select
@@ -1104,7 +1124,7 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Sub-account of
             </label>
             <select
@@ -1121,7 +1141,7 @@ export default function AccountsPage() {
                   </option>
                 ))}
             </select>
-            <p className="mt-1 text-xs text-[var(--color-secondary)]">
+            <p className="mt-2 text-xs text-[var(--color-secondary)]">
               If set, this account&apos;s balance will be subtracted from the parent&apos;s
               displayed balance.
             </p>
@@ -1157,6 +1177,7 @@ export default function AccountsPage() {
             <select
               value={migrateTarget}
               onChange={(e) => setMigrateTarget(e.target.value)}
+              aria-label="Account to migrate transactions to"
               className="field"
             >
               <option value="">Select account to migrate...</option>

@@ -177,22 +177,26 @@ export default function CategoriesPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
+        <div
+          role="status"
+          aria-label="Loading"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent"
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-label text-[11px] text-[var(--color-secondary)]">Taxonomy</p>
-          <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+          <p className="label-caps">Taxonomy</p>
+          <h1 className="page-title mt-1">
             Categories
           </h1>
         </div>
-        <button onClick={openCreate} className="btn btn-primary">
-          <Plus size={16} />
+        <button onClick={openCreate} className="btn btn-primary w-full sm:w-auto">
+          <Plus size={16} aria-hidden />
           Add Category
         </button>
       </div>
@@ -200,14 +204,14 @@ export default function CategoriesPage() {
       {pageError && <div className="notice notice-danger">{pageError}</div>}
 
       {(["income", "expense", "transfer"] as const).map((type) => (
-        <div key={type}>
-          <h2 className="font-label mb-3 text-[11px] text-[var(--color-secondary)]">
+        <section key={type}>
+          <h2 className="label-caps mb-3">
             {type} ({grouped[type].length})
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {grouped[type].map((cat) => (
-              <Card key={cat.id} className="p-4">
-                <div className="flex items-center justify-between">
+              <Card key={cat.id} className="py-3 pl-4 pr-2 sm:py-3 sm:pl-4 sm:pr-2">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-3">
                     <div
                       className="h-4 w-4 flex-none rounded-full"
@@ -225,24 +229,24 @@ export default function CategoriesPage() {
                   <div className="flex flex-none gap-1">
                     <button
                       onClick={() => openEdit(cat)}
-                      aria-label="Edit category"
-                      className="btn btn-ghost px-2 py-1.5"
+                      aria-label={`Edit category ${cat.name}`}
+                      className="btn btn-ghost btn-icon"
                     >
-                      <Pencil size={14} />
+                      <Pencil size={16} aria-hidden />
                     </button>
                     <button
                       onClick={() => handleDelete(cat.id)}
-                      aria-label="Delete category"
-                      className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
+                      aria-label={`Delete category ${cat.name}`}
+                      className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} aria-hidden />
                     </button>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
-        </div>
+        </section>
       ))}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Category" : "New Category"}>
@@ -257,7 +261,7 @@ export default function CategoriesPage() {
           {formError && <div className="notice notice-danger">{formError}</div>}
 
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Name
             </label>
             <input
@@ -269,7 +273,7 @@ export default function CategoriesPage() {
             />
           </div>
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <label className="field-label">
               Type
             </label>
             <select
@@ -283,18 +287,17 @@ export default function CategoriesPage() {
             </select>
           </div>
           <div>
-            <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+            <p className="field-label">
               Color
-            </label>
+            </p>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setForm({ ...form, color: c })}
-                  className={`h-7 w-7 rounded-full border-2 transition ${
-                    form.color === c ? "border-[var(--color-primary)]" : "border-transparent"
-                  }`}
+                  aria-pressed={form.color === c}
+                  className="swatch"
                   style={{ backgroundColor: c }}
                   aria-label={`Color ${c}`}
                 />

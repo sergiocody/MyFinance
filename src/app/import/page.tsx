@@ -692,16 +692,16 @@ export default function ImportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="font-label text-[11px] text-[var(--color-secondary)]">Ledger</p>
-        <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+        <p className="label-caps">Ledger</p>
+        <h1 className="page-title mt-1">
           Import Transactions
         </h1>
       </div>
 
       {error && (
-        <div className="notice notice-danger flex items-center gap-2">
-          <XCircle size={16} />
-          {error}
+        <div role="alert" className="notice notice-danger flex items-start gap-2">
+          <XCircle size={16} className="mt-0.5 flex-none" aria-hidden />
+          <span className="min-w-0 wrap-anywhere">{error}</span>
         </div>
       )}
 
@@ -709,10 +709,11 @@ export default function ImportPage() {
         <Card>
           <div className="space-y-4">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="import-account" className="field-label">
                 Import into Account
               </label>
               <select
+                id="import-account"
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
                 className="field max-w-sm"
@@ -726,10 +727,11 @@ export default function ImportPage() {
             </div>
 
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="import-parser" className="field-label">
                 Parser
               </label>
               <select
+                id="import-parser"
                 value={parserProvider}
                 onChange={(e) => setParserProvider(e.target.value as ParserProvider)}
                 className="field max-w-sm"
@@ -739,7 +741,7 @@ export default function ImportPage() {
                 <option value="ollama-qwen">Ollama Qwen (qwen3:8b)</option>
                 <option value="raw">No AI (import as-is)</option>
               </select>
-              <p className="mt-1 text-xs text-[var(--color-secondary)]">
+              <p className="mt-2 text-xs text-[var(--color-secondary)]">
                 {parserOptions[parserProvider].description}
               </p>
             </div>
@@ -751,33 +753,33 @@ export default function ImportPage() {
                 setDragOver(true);
               }}
               onDragLeave={() => setDragOver(false)}
-              className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed p-8 transition-colors sm:p-12 ${
+              className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed p-6 text-center transition-colors duration-150 sm:p-12 ${
                 dragOver
                   ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.06)]"
                   : "border-[var(--color-border-strong)] hover:border-[var(--color-secondary)]"
               }`}
             >
-              <Upload className="mb-4 h-10 w-10 text-[var(--color-secondary)] sm:h-12 sm:w-12" />
+              <Upload className="mb-4 h-10 w-10 text-[var(--color-secondary)] sm:h-12 sm:w-12" aria-hidden />
               <p className="mb-2 text-sm font-medium text-[var(--color-primary)]">
                 Drop your CSV file here
               </p>
               <p className="mb-4 text-xs text-[var(--color-secondary)]">
                 or click to browse. Supports CSV exports from most banks.
               </p>
-              <label className="btn btn-primary cursor-pointer">
+              <label className="btn btn-primary w-full cursor-pointer sm:w-auto">
                 Browse Files
                 <input
                   type="file"
                   accept=".csv,.tsv,.txt"
                   onChange={handleFileInput}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
             </div>
 
             <div className="notice notice-info">
               <p className="font-medium">How it works</p>
-              <ol className="mt-1 list-inside list-decimal space-y-1 text-xs">
+              <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
                 <li>Select the account to import into</li>
                 <li>Choose Gemini, Ollama Gemma, or Ollama Qwen as the parser</li>
                 <li>Drop your bank CSV export file</li>
@@ -791,12 +793,12 @@ export default function ImportPage() {
 
       {step === "parsing" && (
         <Card>
-          <div className="flex flex-col items-center py-12">
-            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" />
-            <p className="font-medium text-[var(--color-primary)]">
+          <div className="flex flex-col items-center py-12 text-center">
+            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" aria-hidden />
+            <p role="status" className="font-medium text-[var(--color-primary)]">
               Analyzing your file with {parserLabel}...
             </p>
-            <p className="mt-1 text-sm text-[var(--color-secondary)]">
+            <p className="mt-1 text-sm text-[var(--color-secondary)] wrap-anywhere">
               Parsing {fileName} and categorizing transactions with {parserLabel}
             </p>
           </div>
@@ -806,9 +808,9 @@ export default function ImportPage() {
       {step === "review" && (
         <>
           <Card>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <FileText className="mt-0.5 h-5 w-5 text-[var(--color-tertiary)]" />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <FileText className="mt-0.5 h-5 w-5 flex-none text-[var(--color-tertiary)]" aria-hidden />
                 <div className="min-w-0">
                   <p className="truncate font-medium text-[var(--color-primary)]">{fileName}</p>
                   <p className="text-xs text-[var(--color-secondary)]">
@@ -816,14 +818,14 @@ export default function ImportPage() {
                     {transactions.filter((t) => t.selected).length} selected
                   </p>
                   {currentAccount && (
-                    <p className="mt-0.5 text-xs font-medium text-[var(--color-tertiary)]">
+                    <p className="mt-1 text-xs font-medium text-[var(--color-tertiary)]">
                       → Importing into: {currentAccount.name}
                       {currentAccount.bank_name ? ` (${currentAccount.bank_name})` : ""}
                     </p>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
                 <button onClick={reset} className="btn btn-secondary">
                   Cancel
                 </button>
@@ -837,9 +839,9 @@ export default function ImportPage() {
               </div>
             </div>
             {projectedBalance !== null && currentAccount && (
-              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-[var(--color-border)] pt-3 text-sm">
-                <span className="flex items-center gap-1.5 text-[var(--color-secondary)]">
-                  Saldo actual:&nbsp;
+              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
+                <span className="flex flex-wrap items-center gap-2 text-[var(--color-secondary)]">
+                  Saldo actual:
                   {editingBalance ? (
                     <input
                       type="number"
@@ -851,13 +853,15 @@ export default function ImportPage() {
                         if (e.key === "Enter") setEditingBalance(false);
                       }}
                       autoFocus
-                      className="field w-28 px-2 py-0.5 text-sm font-medium"
+                      aria-label="Saldo actual"
+                      className="field field-sm w-32 font-medium"
                     />
                   ) : (
                     <button
+                      type="button"
                       onClick={() => setEditingBalance(true)}
                       title="Haz clic para corregir el saldo actual"
-                      className="font-medium text-[var(--color-primary)] underline decoration-dashed underline-offset-2 hover:text-[var(--color-tertiary)]"
+                      className="pressable hit-area rounded-sm font-medium tabular-nums text-[var(--color-primary)] underline decoration-dashed underline-offset-4 hover:text-[var(--color-tertiary)]"
                     >
                       {formatCurrency(baseBalance)}
                     </button>
@@ -888,7 +892,7 @@ export default function ImportPage() {
 
           {transactions.some((tx) => tx.duplicateSource) && (
             <div className="notice notice-warning flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" aria-hidden />
               <div>
                 <p className="font-medium">Duplicate transactions detected</p>
                 <p className="mt-1">
@@ -905,22 +909,23 @@ export default function ImportPage() {
                   <th className="px-4 py-3">
                     <input
                       type="checkbox"
+                      aria-label="Select all transactions"
                       checked={
                         transactions.filter((t) => !t.validationError).length > 0 &&
                         transactions.filter((t) => !t.validationError).every((t) => t.selected)
                       }
                       onChange={toggleAll}
-                      className="rounded-sm"
+                      className="h-4 w-4 rounded-sm accent-[var(--color-tertiary)]"
                     />
                   </th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Date</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Description</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Status</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Type</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Transfer</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Category</th>
-                  <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Labels</th>
-                  <th className="font-label px-4 py-3 text-right text-[11px] text-[var(--color-secondary)]">Amount</th>
+                  <th className="label-caps px-4 py-3">Date</th>
+                  <th className="label-caps px-4 py-3">Description</th>
+                  <th className="label-caps px-4 py-3">Status</th>
+                  <th className="label-caps px-4 py-3">Type</th>
+                  <th className="label-caps px-4 py-3">Transfer</th>
+                  <th className="label-caps px-4 py-3">Category</th>
+                  <th className="label-caps px-4 py-3">Labels</th>
+                  <th className="label-caps px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
@@ -932,10 +937,11 @@ export default function ImportPage() {
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
+                        aria-label={`Select transaction ${tx.description || i + 1}`}
                         checked={tx.selected}
                         disabled={Boolean(tx.validationError)}
                         onChange={() => toggleTransaction(i)}
-                        className="rounded-sm"
+                        className="h-4 w-4 rounded-sm accent-[var(--color-tertiary)]"
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
@@ -968,7 +974,8 @@ export default function ImportPage() {
                         onChange={(e) =>
                           updateType(i, e.target.value as "income" | "expense" | "transfer")
                         }
-                        className={`rounded-sm border px-2 py-1 text-xs font-medium ${TYPE_SELECT_CLASS[tx.type]}`}
+                        aria-label="Transaction type"
+                        className={`field field-sm w-auto font-medium ${TYPE_SELECT_CLASS[tx.type]}`}
                       >
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
@@ -981,7 +988,8 @@ export default function ImportPage() {
                           <select
                             value={tx.transfer_account_id ?? ""}
                             onChange={(e) => updateTransferAccount(i, e.target.value)}
-                            className="field min-w-40 px-2 py-1 text-xs"
+                            aria-label="Transfer counterpart account"
+                            className="field field-sm min-w-40"
                           >
                             <option value="">Select account</option>
                             {accounts
@@ -995,7 +1003,8 @@ export default function ImportPage() {
                           <select
                             value={tx.selected_account_role ?? "source"}
                             onChange={(e) => updateTransferRole(i, e.target.value as TransferRole)}
-                            className="field min-w-32 px-2 py-1 text-xs"
+                            aria-label="Transfer direction"
+                            className="field field-sm min-w-32"
                           >
                             <option value="source">Outgoing</option>
                             <option value="destination">Incoming</option>
@@ -1009,7 +1018,8 @@ export default function ImportPage() {
                       <select
                         value={tx.category_id ?? ""}
                         onChange={(e) => updateCategory(i, e.target.value)}
-                        className="field px-2 py-1 text-xs"
+                        aria-label="Category"
+                        className="field field-sm min-w-32"
                       >
                         <option value="">None</option>
                         {categories
@@ -1021,7 +1031,7 @@ export default function ImportPage() {
                           ))}
                       </select>
                       {tx.category_id && (
-                        <p className="font-label mt-1 text-[10px] text-[var(--color-tertiary)]">
+                        <p className="label-caps mt-1 text-[var(--color-tertiary)]">
                           AI suggestion
                         </p>
                       )}
@@ -1033,7 +1043,7 @@ export default function ImportPage() {
                         onChange={(labelIds) => updateLabels(i, labelIds)}
                       />
                       {tx.label_ids.length > 0 && (
-                        <p className="font-label mt-1 text-[10px] text-[var(--color-tertiary)]">
+                        <p className="label-caps mt-1 text-[var(--color-tertiary)]">
                           Suggested labels
                         </p>
                       )}
@@ -1071,22 +1081,22 @@ export default function ImportPage() {
       {step === "importing" && (
         <Card>
           <div className="flex flex-col items-center py-12">
-            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" />
-            <p className="font-medium text-[var(--color-primary)]">Importing transactions...</p>
+            <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" aria-hidden />
+            <p role="status" className="font-medium text-[var(--color-primary)]">Importing transactions...</p>
           </div>
         </Card>
       )}
 
       {step === "done" && (
         <Card>
-          <div className="flex flex-col items-center py-12">
-            <CheckCircle2 className="mb-4 h-12 w-12 text-[var(--color-success)]" />
-            <p className="text-lg font-semibold text-[var(--color-primary)]">Import Complete!</p>
+          <div className="flex flex-col items-center py-12 text-center">
+            <CheckCircle2 className="mb-4 h-12 w-12 text-[var(--color-success)]" aria-hidden />
+            <p className="section-title">Import Complete!</p>
             <p className="mt-1 text-sm text-[var(--color-secondary)]">
               {importResult.imported} transactions imported
               {importResult.skipped > 0 && `, ${importResult.skipped} skipped`}
             </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
               <button onClick={reset} className="btn btn-secondary">
                 Import More
               </button>
@@ -1131,17 +1141,17 @@ function ImportHistory() {
 
   return (
     <Card>
-      <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">Recent Imports</h3>
+      <h3 className="label-caps mb-4">Recent Imports</h3>
       <div className="space-y-2">
         {imports.map((imp) => (
           <div
             key={imp.id}
-            className="flex items-center justify-between rounded-md border border-[var(--color-border)] px-4 py-2"
+            className="flex items-center justify-between rounded-md border border-[var(--color-border)] px-4 py-3"
           >
-            <div className="flex items-center gap-3">
-              <FileText size={16} className="text-[var(--color-secondary)]" />
-              <div>
-                <p className="text-sm font-medium text-[var(--color-primary)]">{imp.filename}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <FileText size={16} className="flex-none text-[var(--color-secondary)]" aria-hidden />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-[var(--color-primary)]">{imp.filename}</p>
                 <p className="text-xs text-[var(--color-secondary)]">
                   {imp.accounts?.name} · {imp.rows_imported} imported
                   {imp.rows_skipped > 0 ? ` · ${imp.rows_skipped} skipped` : ""}

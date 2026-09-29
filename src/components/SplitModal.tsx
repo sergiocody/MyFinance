@@ -146,13 +146,13 @@ export function SplitModal({
       <div className="flex h-full flex-col bg-[var(--color-neutral)]">
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-6">
           <section className="surface-card rounded-md p-4 sm:p-5">
-            <p className="font-label text-[11px] text-[var(--color-secondary)]">Original transaction</p>
+            <p className="label-caps">Original transaction</p>
             <p className="mt-1 truncate text-base font-semibold text-[var(--color-primary)]">
               {transaction.description || "Untitled"}
             </p>
             <div className="mt-3 flex items-baseline justify-between gap-3">
               <span className="text-sm text-[var(--color-secondary)]">Total</span>
-              <span className="text-2xl font-semibold text-[var(--color-primary)]">
+              <span className="stat-value text-[var(--color-primary)]">
                 {formatCurrency(total)}
               </span>
             </div>
@@ -180,15 +180,15 @@ export function SplitModal({
             {rows.map((row, index) => (
               <div key={index} className="surface-card space-y-3 rounded-md p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-label text-[11px] text-[var(--color-secondary)]">
+                  <span className="label-caps">
                     Split {index + 1}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="-mr-2 flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => distributeRemaining(index)}
                       disabled={balanced}
-                      className="btn btn-ghost px-2 py-1 text-xs disabled:opacity-40"
+                      className="btn btn-ghost btn-sm"
                       title="Assign remaining amount here"
                     >
                       Fill rest
@@ -198,17 +198,17 @@ export function SplitModal({
                         type="button"
                         onClick={() => removeRow(index)}
                         aria-label="Remove split"
-                        className="btn btn-ghost px-2 py-1 hover:!text-[var(--color-danger)]"
+                        className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} aria-hidden />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,140px)]">
-                  <div>
-                    <label className="font-label mb-1 block text-[11px] text-[var(--color-secondary)]">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <label className="field-label">
                       Category
                     </label>
                     <select
@@ -226,7 +226,7 @@ export function SplitModal({
                   </div>
 
                   <div>
-                    <label className="font-label mb-1 block text-[11px] text-[var(--color-secondary)]">
+                    <label className="field-label">
                       Amount
                     </label>
                     <div className="relative">
@@ -248,7 +248,7 @@ export function SplitModal({
                 </div>
 
                 <div>
-                  <label className="font-label mb-1 block text-[11px] text-[var(--color-secondary)]">
+                  <label className="field-label">
                     Description (optional)
                   </label>
                   <input
@@ -261,7 +261,7 @@ export function SplitModal({
                 </div>
 
                 <div>
-                  <label className="font-label mb-1 block text-[11px] text-[var(--color-secondary)]">
+                  <label className="field-label">
                     Labels
                   </label>
                   <LabelMultiSelect
@@ -278,7 +278,7 @@ export function SplitModal({
               onClick={addRow}
               className="btn btn-secondary w-full"
             >
-              <Plus size={14} />
+              <Plus size={16} aria-hidden />
               Add another split
             </button>
           </section>

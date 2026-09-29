@@ -1,0 +1,22 @@
+# Sistema de Diseño y Reglas de UI/UX
+
+## Tokens Visuales
+- Utiliza únicamente las variables de tema/clases del proyecto (ej. Tailwind CSS o CSS Modules).
+- Prohibido el uso de colores hexadecimales en línea arbitrarios. Utiliza la paleta primaria, secundaria y neutra del sistema.
+- Escala de espaciado uniforme: usa múltiplos de 4px/8px para márgenes y paddings.
+
+## Botones y Micro-interacciones
+- Jerarquía estricta:
+  - Primario: Un solo CTA principal por vista visual. Alto contraste.
+  - Secundario: Bordes definidos o fondos suaves.
+  - Terciario / Fantasma: Sin fondo, solo texto con hover sutil.
+- Todos los botones deben implementar obligatoriamente:
+  - `hover`: Cambio sutil de fondo o brillo.
+  - `active`: Efecto de presión (ej. `scale(0.98)` o oscurecimiento).
+  - `focus-visible`: Anillo de enfoque claro para accesibilidad.
+  - Transición fluida: `transition: all 150ms ease-in-out`.
+
+## Usabilidad y Accesibilidad
+- Diseño Responsive: Mobile-first. Verifica que los touch targets en móvil midan al menos 44x44px.
+- Contraste WCAG AA: El texto debe destacar claramente sobre el fondo.
+- Elementos interactivos sin texto (ej. botones con solo icono) requieren atributo `aria-label`.

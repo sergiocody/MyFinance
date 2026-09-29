@@ -456,11 +456,11 @@ export default function ExportPage() {
 
   return (
     <div className="space-y-6">
-      <section className="surface-card overflow-hidden rounded-md px-5 py-6 sm:px-6 sm:py-8">
-        <p className="font-label text-[11px] text-[var(--color-secondary)]">Data Portability</p>
-        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className="surface-card overflow-hidden rounded-md px-4 py-6 sm:px-6 sm:py-8">
+        <p className="label-caps">Data Portability</p>
+        <div className="mt-2 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-primary)] sm:text-3xl">
+            <h1 className="page-title">
               Export your finance tables to CSV
             </h1>
             <p className="text-sm text-[var(--color-secondary)] sm:text-base">
@@ -469,28 +469,28 @@ export default function ExportPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] text-[var(--color-secondary)]">Transactions</p>
-              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 sm:gap-3">
+            <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
+              <p className="label-caps truncate text-2xs sm:text-xs" title="Transactions">Transactions</p>
+              <p className="stat-value mt-2 text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.transactions}
               </p>
             </div>
-            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] text-[var(--color-secondary)]">Accounts</p>
-              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
+            <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
+              <p className="label-caps truncate text-2xs sm:text-xs">Accounts</p>
+              <p className="stat-value mt-2 text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.accounts}
               </p>
             </div>
-            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] text-[var(--color-secondary)]">Categories</p>
-              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
+            <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
+              <p className="label-caps truncate text-2xs sm:text-xs">Categories</p>
+              <p className="stat-value mt-2 text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.categories}
               </p>
             </div>
-            <div className="rounded-md border border-[var(--color-border)] bg-white/90 px-4 py-3">
-              <p className="font-label text-[10px] text-[var(--color-secondary)]">Labels</p>
-              <p className="mt-2 text-xl font-semibold text-[var(--color-primary)]">
+            <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
+              <p className="label-caps truncate text-2xs sm:text-xs">Labels</p>
+              <p className="stat-value mt-2 text-[var(--color-primary)]">
                 {summaryLoading ? "..." : counts.labels}
               </p>
             </div>
@@ -504,18 +504,18 @@ export default function ExportPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-5">
+        <Card className="space-y-6 xl:col-span-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-4">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(184,66,46,0.12)] text-[var(--color-tertiary)]">
-                <CalendarRange className="h-5 w-5" />
+                <CalendarRange className="h-5 w-5" aria-hidden />
               </div>
               <div>
-                <p className="font-label text-[11px] text-[var(--color-secondary)]">
+                <p className="label-caps">
                   Transactions CSV
                 </p>
-                <h2 className="mt-2 text-xl font-semibold tracking-tight text-[var(--color-primary)] sm:text-2xl">
+                <h2 className="section-title mt-1">
                   Export by date range
                 </h2>
                 <p className="mt-1 max-w-xl text-sm text-[var(--color-secondary)]">
@@ -530,12 +530,12 @@ export default function ExportPage() {
               type="button"
               onClick={handleExportTransactions}
               disabled={summaryLoading || exporting.transactions}
-              className={primaryButtonClassName}
+              className={`${primaryButtonClassName} w-full flex-none sm:w-auto`}
             >
               {exporting.transactions ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                <Download className="h-4 w-4" />
+                <Download className="h-4 w-4" aria-hidden />
               )}
               Export transactions
             </button>
@@ -543,10 +543,11 @@ export default function ExportPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="export-from" className="field-label">
                 From
               </label>
               <input
+                id="export-from"
                 type="date"
                 value={transactionDateFrom}
                 max={transactionDateTo || today}
@@ -555,10 +556,11 @@ export default function ExportPage() {
               />
             </div>
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="export-to" className="field-label">
                 To
               </label>
               <input
+                id="export-to"
                 type="date"
                 value={transactionDateTo}
                 min={transactionDateFrom || undefined}
@@ -568,10 +570,11 @@ export default function ExportPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="export-account" className="field-label">
                 Account
               </label>
               <select
+                id="export-account"
                 value={transactionAccountId}
                 onChange={(event) => setTransactionAccountId(event.target.value)}
                 className={inputClassName}
@@ -593,21 +596,21 @@ export default function ExportPage() {
           )}
         </Card>
 
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6 xl:col-span-2">
           <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
-                  <Wallet className="h-5 w-5" />
+                  <Wallet className="h-5 w-5" aria-hidden />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
+                <h2 className="section-title mt-4">
                   Accounts
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `accounts` table with balances, currencies, and account metadata.
                 </p>
               </div>
-              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
+              <span className="chip flex-none whitespace-nowrap">
                 {summaryLoading ? "..." : `${counts.accounts} rows`}
               </span>
             </div>
@@ -616,12 +619,12 @@ export default function ExportPage() {
               type="button"
               onClick={handleExportAccounts}
               disabled={exporting.accounts}
-              className={secondaryButtonClassName}
+              className={`${secondaryButtonClassName} w-full sm:w-auto`}
             >
               {exporting.accounts ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                <Download className="h-4 w-4" />
+                <Download className="h-4 w-4" aria-hidden />
               )}
               Export accounts
             </button>
@@ -633,18 +636,18 @@ export default function ExportPage() {
 
           <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
-                  <FolderOpen className="h-5 w-5" />
+                  <FolderOpen className="h-5 w-5" aria-hidden />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
+                <h2 className="section-title mt-4">
                   Categories
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `categories` table ordered by type and name.
                 </p>
               </div>
-              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
+              <span className="chip flex-none whitespace-nowrap">
                 {summaryLoading ? "..." : `${counts.categories} rows`}
               </span>
             </div>
@@ -653,12 +656,12 @@ export default function ExportPage() {
               type="button"
               onClick={handleExportCategories}
               disabled={exporting.categories}
-              className={secondaryButtonClassName}
+              className={`${secondaryButtonClassName} w-full sm:w-auto`}
             >
               {exporting.categories ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                <Download className="h-4 w-4" />
+                <Download className="h-4 w-4" aria-hidden />
               )}
               Export categories
             </button>
@@ -672,18 +675,18 @@ export default function ExportPage() {
 
           <Card className="space-y-4">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-[rgba(26,28,30,0.06)] text-[var(--color-primary)]">
-                  <Tag className="h-5 w-5" />
+                  <Tag className="h-5 w-5" aria-hidden />
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
+                <h2 className="section-title mt-4">
                   Labels
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
                   Export the full `labels` table with colors and creation timestamps.
                 </p>
               </div>
-              <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-secondary)]">
+              <span className="chip flex-none whitespace-nowrap">
                 {summaryLoading ? "..." : `${counts.labels} rows`}
               </span>
             </div>
@@ -692,12 +695,12 @@ export default function ExportPage() {
               type="button"
               onClick={handleExportLabels}
               disabled={exporting.labels}
-              className={secondaryButtonClassName}
+              className={`${secondaryButtonClassName} w-full sm:w-auto`}
             >
               {exporting.labels ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                <Download className="h-4 w-4" />
+                <Download className="h-4 w-4" aria-hidden />
               )}
               Export labels
             </button>

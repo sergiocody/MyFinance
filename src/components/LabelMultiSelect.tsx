@@ -49,24 +49,24 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
   return (
     <div ref={containerRef} className="relative w-full min-w-0">
       <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-white">
-        <div className="flex min-h-10 flex-wrap items-center gap-1.5 px-2 py-2">
+        <div className="flex min-h-10 flex-wrap items-center gap-2 p-2">
           {selectedLabels.length === 0 ? (
-            <span className="text-[11px] text-[var(--color-secondary)]">No labels selected</span>
+            <span className="text-xs text-[var(--color-secondary)]">No labels selected</span>
           ) : (
             selectedLabels.map((label) => (
               <span
                 key={label.id}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                className="chip"
                 style={{ backgroundColor: `${label.color}20`, color: label.color }}
               >
                 {label.name}
                 <button
                   type="button"
                   onClick={() => removeLabel(label.id)}
-                  className="rounded-full p-0.5 transition hover:bg-black/10"
+                  className="pressable hit-area -mr-1 rounded-full p-0.5 hover:bg-black/10"
                   aria-label={`Remove ${label.name}`}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3 w-3" aria-hidden />
                 </button>
               </span>
             ))
@@ -75,15 +75,17 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
-          className="flex w-full items-center justify-between border-t border-[var(--color-border)] px-2 py-1.5 text-[11px] font-medium text-[var(--color-secondary)] transition hover:bg-[rgba(26,28,30,0.04)]"
+          aria-expanded={open}
+          className="pressable tap-target flex w-full items-center justify-between gap-2 border-t border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
         >
-          <span>
+          <span className="truncate">
             {selectedLabels.length > 0
               ? `${selectedLabels.length} label${selectedLabels.length === 1 ? "" : "s"} selected`
               : "Choose one or more labels"}
           </span>
           <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+            className={`h-4 w-4 flex-none transition-transform duration-150 ${open ? "rotate-180" : ""}`}
           />
         </button>
       </div>
@@ -91,7 +93,7 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
       {open && (
         <div className="surface-card-strong absolute left-0 top-full z-20 mt-2 w-full rounded-md p-1 sm:w-64">
           {labels.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-[var(--color-secondary)]">No labels available</p>
+            <p className="px-3 py-2 text-sm text-[var(--color-secondary)]">No labels available</p>
           ) : (
             <div className="max-h-56 overflow-y-auto">
               {labels.map((label) => {
@@ -102,18 +104,19 @@ export function LabelMultiSelect({ labels, selectedIds, onChange }: LabelMultiSe
                     key={label.id}
                     type="button"
                     onClick={() => toggleLabel(label.id)}
-                    className={`flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs transition ${
+                    aria-pressed={selected}
+                    className={`pressable tap-target flex w-full items-center gap-2 rounded-sm px-3 text-left text-sm ${
                       selected
                         ? "bg-[rgba(184,66,46,0.10)] text-[var(--color-tertiary)]"
-                        : "text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)] hover:text-[var(--color-primary)]"
+                        : "text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                     }`}
                   >
                     <span
-                      className="h-2.5 w-2.5 rounded-full"
+                      className="h-2.5 w-2.5 flex-none rounded-full"
                       style={{ backgroundColor: label.color }}
                     />
                     <span className="flex-1 truncate">{label.name}</span>
-                    {selected && <Check className="h-3.5 w-3.5" />}
+                    {selected && <Check className="h-4 w-4 flex-none" aria-hidden />}
                   </button>
                 );
               })}

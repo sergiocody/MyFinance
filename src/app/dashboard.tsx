@@ -87,11 +87,11 @@ const QUICK_TRANSACTION_LINKS = [
 
 const QUICK_LINK_CLASS: Record<(typeof QUICK_TRANSACTION_LINKS)[number]["accent"], string> = {
   danger:
-    "border-[rgba(184,66,46,0.24)] bg-[rgba(184,66,46,0.06)] text-[var(--color-danger)] hover:bg-[rgba(184,66,46,0.10)]",
+    "border-[rgba(184,66,46,0.24)] bg-[rgba(184,66,46,0.06)] text-[var(--color-danger)] hover:border-[rgba(184,66,46,0.4)] hover:bg-[rgba(184,66,46,0.10)]",
   success:
-    "border-[rgba(63,107,78,0.24)] bg-[rgba(63,107,78,0.06)] text-[var(--color-success)] hover:bg-[rgba(63,107,78,0.10)]",
+    "border-[rgba(63,107,78,0.24)] bg-[rgba(63,107,78,0.06)] text-[var(--color-success)] hover:border-[rgba(63,107,78,0.4)] hover:bg-[rgba(63,107,78,0.10)]",
   info:
-    "border-[rgba(58,79,102,0.24)] bg-[rgba(58,79,102,0.06)] text-[var(--color-info)] hover:bg-[rgba(58,79,102,0.10)]",
+    "border-[rgba(58,79,102,0.24)] bg-[rgba(58,79,102,0.06)] text-[var(--color-info)] hover:border-[rgba(58,79,102,0.4)] hover:bg-[rgba(58,79,102,0.10)]",
 };
 
 export default function Dashboard() {
@@ -231,7 +231,11 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent" />
+        <div
+          role="status"
+          aria-label="Loading"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-tertiary)] border-t-transparent"
+        />
       </div>
     );
   }
@@ -239,9 +243,9 @@ export default function Dashboard() {
   const net = monthIncome - monthExpense;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-3 sm:gap-4">
             <Image
               src="/Myfinance.png"
@@ -250,9 +254,9 @@ export default function Dashboard() {
               height={48}
               className="mt-1 h-10 w-10 flex-none object-contain sm:h-12 sm:w-12"
             />
-            <div>
-              <p className="font-label text-[11px] text-[var(--color-secondary)]">Overview</p>
-              <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+            <div className="min-w-0">
+              <p className="label-caps">Overview</p>
+              <h1 className="page-title mt-1">
                 Dashboard
               </h1>
               <p className="mt-1 text-sm text-[var(--color-secondary)]">
@@ -264,26 +268,26 @@ export default function Dashboard() {
             href="/transactions?new=1&flow=expense"
             className="btn btn-primary w-full sm:w-auto"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden />
             New Transaction
           </Link>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           {QUICK_TRANSACTION_LINKS.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-start gap-3 rounded-md border p-4 transition ${QUICK_LINK_CLASS[item.accent]}`}
+                className={`pressable flex items-center gap-3 rounded-md border p-4 ${QUICK_LINK_CLASS[item.accent]}`}
               >
-                <span className="inline-flex rounded-full bg-white/80 p-2">
-                  <Icon className="h-4 w-4" />
+                <span className="inline-flex flex-none rounded-full bg-white/80 p-2">
+                  <Icon className="h-4 w-4" aria-hidden />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className="mt-0.5 block text-xs text-current/80">{item.description}</span>
+                  <span className="mt-1 block text-xs text-current/80">{item.description}</span>
                 </span>
               </Link>
             );
@@ -291,13 +295,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle>Total Balance</CardTitle>
-            <Wallet className="h-5 w-5 text-[var(--color-tertiary)]" />
+            <Wallet className="h-5 w-5 flex-none text-[var(--color-tertiary)]" aria-hidden />
           </CardHeader>
-          <p className="text-xl font-semibold text-[var(--color-primary)] sm:text-2xl">
+          <p className="stat-value text-[var(--color-primary)]">
             {formatCurrency(totalBalance)}
           </p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">
@@ -308,40 +312,40 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Monthly Income</CardTitle>
-            <TrendingUp className="h-5 w-5 text-[var(--color-success)]" />
+            <TrendingUp className="h-5 w-5 flex-none text-[var(--color-success)]" aria-hidden />
           </CardHeader>
-          <p className="amount-pos text-xl font-semibold sm:text-2xl">{formatCurrency(monthIncome)}</p>
+          <p className="stat-value amount-pos">{formatCurrency(monthIncome)}</p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">{format(new Date(), "MMMM yyyy")}</p>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Monthly Expenses</CardTitle>
-            <TrendingDown className="h-5 w-5 text-[var(--color-danger)]" />
+            <TrendingDown className="h-5 w-5 flex-none text-[var(--color-danger)]" aria-hidden />
           </CardHeader>
-          <p className="amount-neg text-xl font-semibold sm:text-2xl">{formatCurrency(monthExpense)}</p>
+          <p className="stat-value amount-neg">{formatCurrency(monthExpense)}</p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">{format(new Date(), "MMMM yyyy")}</p>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Net This Month</CardTitle>
-            <ArrowRightLeft className="h-5 w-5 text-[var(--color-secondary)]" />
+            <ArrowRightLeft className="h-5 w-5 flex-none text-[var(--color-secondary)]" aria-hidden />
           </CardHeader>
-          <p className={`text-xl font-semibold sm:text-2xl ${net >= 0 ? "amount-pos" : "amount-neg"}`}>
+          <p className={`stat-value ${net >= 0 ? "amount-pos" : "amount-neg"}`}>
             {formatCurrency(net)}
           </p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">Income - Expenses</p>
         </Card>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Remunerated</CardTitle>
-            <PiggyBank className="h-5 w-5 text-[var(--color-success)]" />
+            <PiggyBank className="h-5 w-5 flex-none text-[var(--color-success)]" aria-hidden />
           </CardHeader>
-          <p className="text-xl font-semibold text-[var(--color-primary)] sm:text-2xl">
+          <p className="stat-value text-[var(--color-primary)]">
             {formatCurrency(remuneratedBalance)}
           </p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">
@@ -352,9 +356,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Non-remunerated</CardTitle>
-            <Landmark className="h-5 w-5 text-[var(--color-secondary)]" />
+            <Landmark className="h-5 w-5 flex-none text-[var(--color-secondary)]" aria-hidden />
           </CardHeader>
-          <p className="text-xl font-semibold text-[var(--color-primary)] sm:text-2xl">
+          <p className="stat-value text-[var(--color-primary)]">
             {formatCurrency(nonRemuneratedBalance)}
           </p>
           <p className="mt-1 text-xs text-[var(--color-secondary)]">
@@ -364,29 +368,29 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="min-w-0">
-          <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+        <Card>
+          <h3 className="label-caps mb-4">
             Income, Transfers & Expenses (Last 6 Months)
           </h3>
           <div className="h-56 min-w-0 sm:h-64">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,114,120,0.18)" />
-                <XAxis dataKey="month" stroke="#6C7278" />
-                <YAxis stroke="#6C7278" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="month" stroke="var(--color-secondary)" fontSize={12} />
+                <YAxis stroke="var(--color-secondary)" fontSize={12} />
                 <Tooltip formatter={tooltipCurrency} />
                 <Legend />
-                <Bar dataKey="income" name="Income" fill="#3F6B4E" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="transfer" name="Transfers" fill="#3A4F66" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expenses" fill="#B8422E" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="Income" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="transfer" name="Transfers" fill="var(--color-info)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expenses" fill="var(--color-danger)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
-        <Card className="min-w-0">
-          <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">
+        <Card>
+          <h3 className="label-caps mb-4">
             Expenses by Category (This Month)
           </h3>
           {categoryData.length > 0 ? (
@@ -402,14 +406,14 @@ export default function Dashboard() {
                     href={cat.id !== "uncategorized"
                       ? `/transactions?category=${cat.id}&type=expense&from=${from}&to=${to}`
                       : `/transactions?type=expense&from=${from}&to=${to}`}
-                    className="-mx-2 block space-y-1 rounded-sm px-2 py-1.5 transition hover:bg-[rgba(26,28,30,0.04)]"
+                    className="pressable -mx-2 block space-y-2 rounded-sm px-2 py-2 hover:bg-[var(--color-hover)]"
                   >
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                        <span className="text-[var(--color-primary)]">{cat.name}</span>
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="inline-block h-3 w-3 flex-none rounded-full" style={{ backgroundColor: cat.color }} />
+                        <span className="truncate text-[var(--color-primary)]">{cat.name}</span>
                       </div>
-                      <span className="font-medium text-[var(--color-primary)]">{formatCurrency(cat.value)}</span>
+                      <span className="flex-none font-medium tabular-nums text-[var(--color-primary)]">{formatCurrency(cat.value)}</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(26,28,30,0.06)]">
                       <div
@@ -425,7 +429,7 @@ export default function Dashboard() {
               })()}
               <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-sm font-semibold">
                 <span className="text-[var(--color-secondary)]">Total</span>
-                <span className="text-[var(--color-primary)]">
+                <span className="tabular-nums text-[var(--color-primary)]">
                   {formatCurrency(categoryData.reduce((s, c) => s + c.value, 0))}
                 </span>
               </div>
@@ -439,13 +443,13 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <h3 className="font-label mb-4 text-[11px] text-[var(--color-secondary)]">Accounts</h3>
+        <h3 className="label-caps mb-4">Accounts</h3>
         {accounts.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-white/70 p-3"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-white/70 p-3"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="h-3 w-3 flex-none rounded-full" style={{ backgroundColor: account.color }} />
@@ -457,7 +461,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p
-                  className={`flex-none text-sm font-semibold ${
+                  className={`flex-none text-sm font-semibold tabular-nums ${
                     Number(account.current_balance) >= 0 ? "text-[var(--color-primary)]" : "amount-neg"
                   }`}
                 >

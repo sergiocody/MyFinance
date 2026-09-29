@@ -677,10 +677,10 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div>
-            <p className="font-label text-[11px] text-[var(--color-secondary)]">Ledger</p>
-            <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+            <p className="label-caps">Ledger</p>
+            <h1 className="page-title mt-1">
               Transactions
             </h1>
             <p className="mt-1 text-sm text-[var(--color-secondary)]">
@@ -699,18 +699,26 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary">
-            <Filter size={16} />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-none sm:items-center">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            className="btn btn-secondary"
+          >
+            <Filter size={16} aria-hidden />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-neutral)]">
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-2xs font-semibold text-[var(--color-neutral)]">
                 {activeFilterCount}
               </span>
             )}
           </button>
-          <button onClick={() => setShowBalances(!showBalances)} className="btn btn-secondary">
-            <Landmark size={16} />
+          <button
+            onClick={() => setShowBalances(!showBalances)}
+            aria-expanded={showBalances}
+            className="btn btn-secondary"
+          >
+            <Landmark size={16} aria-hidden />
             Balances
           </button>
           <button
@@ -720,7 +728,7 @@ export default function TransactionsPage() {
             }
             className="btn btn-secondary"
           >
-            <Tags size={16} className={categorizing ? "animate-pulse" : ""} />
+            <Tags size={16} className={categorizing ? "animate-pulse" : ""} aria-hidden />
             Auto-cat
           </button>
           <button
@@ -731,33 +739,33 @@ export default function TransactionsPage() {
                 accounts.find((a) => a.id === filterAccount)?.account_mode === "automated"
             )}
           >
-            <Plus size={16} />
+            <Plus size={16} aria-hidden />
             New expense
           </button>
         </div>
       </div>
 
       {showFilters && (
-        <Card className="space-y-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <Card className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="font-label text-[11px] text-[var(--color-secondary)]">Refine List</p>
-              <h2 className="mt-2 text-xl font-semibold text-[var(--color-primary)]">Filters</h2>
+              <p className="label-caps">Refine List</p>
+              <h2 className="section-title mt-1">Filters</h2>
               <p className="mt-1 text-sm text-[var(--color-secondary)]">
                 Results update instantly as you narrow down the list.
               </p>
             </div>
 
             {activeFilterCount > 0 && (
-              <button onClick={resetFilters} className="btn btn-secondary self-start">
-                <RotateCcw size={14} />
+              <button onClick={resetFilters} className="btn btn-ghost self-start">
+                <RotateCcw size={16} aria-hidden />
                 Reset
               </button>
             )}
           </div>
 
-          <div className="space-y-2">
-            <label className="font-label block text-[11px] text-[var(--color-secondary)]">Type</label>
+          <div>
+            <p className="field-label">Type</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {FILTER_TYPE_OPTIONS.map((option) => {
                 const isActive = filterType === option.value;
@@ -769,10 +777,11 @@ export default function TransactionsPage() {
                       setFilterType(option.value as TransactionFilterType);
                       setPage(0);
                     }}
-                    className={`rounded-md border px-3 py-2 text-sm font-medium transition ${
+                    aria-pressed={isActive}
+                    className={`pressable tap-target rounded-md border px-3 text-sm font-medium ${
                       isActive
                         ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-neutral)]"
-                        : "border-[var(--color-border)] bg-white text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)] hover:text-[var(--color-primary)]"
+                        : "border-[var(--color-border-strong)] bg-white text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                     }`}
                   >
                     {option.label}
@@ -784,16 +793,16 @@ export default function TransactionsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label className="field-label">
                 Account
               </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("account")}
-                className="field flex w-full items-center justify-between text-left sm:hidden"
+                className="field flex w-full items-center justify-between gap-2 text-left sm:hidden"
               >
-                <span>{selectedFilterAccountName}</span>
-                <span className="font-label text-[10px] text-[var(--color-secondary)]">Choose</span>
+                <span className="truncate">{selectedFilterAccountName}</span>
+                <span className="label-caps flex-none">Choose</span>
               </button>
               <select
                 value={filterAccount}
@@ -813,16 +822,16 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label className="field-label">
                 Category
               </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("category")}
-                className="field flex w-full items-center justify-between text-left sm:hidden"
+                className="field flex w-full items-center justify-between gap-2 text-left sm:hidden"
               >
-                <span>{selectedFilterCategoryName}</span>
-                <span className="font-label text-[10px] text-[var(--color-secondary)]">Choose</span>
+                <span className="truncate">{selectedFilterCategoryName}</span>
+                <span className="label-caps flex-none">Choose</span>
               </button>
               <select
                 value={filterCategory}
@@ -842,12 +851,13 @@ export default function TransactionsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="filter-from" className="field-label">
                 From
               </label>
               <input
+                id="filter-from"
                 type="date"
                 value={filterDateFrom}
                 onChange={(e) => {
@@ -859,10 +869,11 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+              <label htmlFor="filter-to" className="field-label">
                 To
               </label>
               <input
+                id="filter-to"
                 type="date"
                 value={filterDateTo}
                 onChange={(e) => {
@@ -879,10 +890,10 @@ export default function TransactionsPage() {
       {showBalances && (
         <Card className="space-y-4">
           <div>
-            <p className="font-label text-[11px] text-[var(--color-secondary)]">Overview</p>
-            <h2 className="mt-2 text-xl font-semibold text-[var(--color-primary)]">Account Balances</h2>
+            <p className="label-caps">Overview</p>
+            <h2 className="section-title mt-1">Account Balances</h2>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
             {accounts.map((account) => {
               const childrenBalanceSum = accounts
                 .filter((a) => a.parent_account_id === account.id)
@@ -894,13 +905,13 @@ export default function TransactionsPage() {
               return (
                 <div
                   key={account.id}
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5"
+                  className="min-w-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
                 >
                   <p className="truncate text-xs text-[var(--color-secondary)]" title={account.name}>
                     {account.name}
                   </p>
                   <p
-                    className={`mt-1 text-sm font-semibold ${
+                    className={`mt-1 text-sm font-semibold tabular-nums wrap-anywhere ${
                       displayBalance >= 0 ? "text-[var(--color-primary)]" : "amount-neg"
                     }`}
                   >
@@ -943,15 +954,15 @@ export default function TransactionsPage() {
                       <div className="mt-1 flex items-center gap-2">
                         <p className="text-xs text-[var(--color-secondary)]">{formatDate(tx.date)}</p>
                         {tx.is_split && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(58,79,102,0.10)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-info)]">
-                            <Split size={10} />
+                          <span className="chip chip-info">
+                            <Split size={12} aria-hidden />
                             Split
                           </span>
                         )}
                       </div>
                     </div>
                     <span
-                      className={`shrink-0 text-sm font-semibold ${amountClass(
+                      className={`shrink-0 text-sm font-semibold tabular-nums ${amountClass(
                         tx.type,
                         filterAccount,
                         tx.transfer_to_account_id
@@ -964,35 +975,36 @@ export default function TransactionsPage() {
 
                   <div className="grid gap-3 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] p-3">
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-label text-[10px] text-[var(--color-secondary)]">Account</span>
-                      <div className="flex items-center gap-2 text-[var(--color-secondary)]">
+                      <span className="label-caps flex-none">Account</span>
+                      <div className="flex min-w-0 items-center gap-2 text-[var(--color-secondary)]">
                         <div
-                          className="h-2 w-2 rounded-full"
+                          className="h-2 w-2 flex-none rounded-full"
                           style={{ backgroundColor: tx.accounts?.color }}
                         />
-                        <span>{tx.accounts?.name ?? "-"}</span>
+                        <span className="truncate">{tx.accounts?.name ?? "-"}</span>
                       </div>
                     </div>
 
                     {tx.destination_account && (
                       <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="font-label text-[10px] text-[var(--color-secondary)]">
+                        <span className="label-caps flex-none">
                           Destination
                         </span>
-                        <div className="flex items-center gap-2 text-[var(--color-secondary)]">
+                        <div className="flex min-w-0 items-center gap-2 text-[var(--color-secondary)]">
                           <div
-                            className="h-2 w-2 rounded-full"
+                            className="h-2 w-2 flex-none rounded-full"
                             style={{ backgroundColor: tx.destination_account.color }}
                           />
-                          <span>{tx.destination_account.name}</span>
+                          <span className="truncate">{tx.destination_account.name}</span>
                         </div>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-label text-[10px] text-[var(--color-secondary)]">Category</span>
+                      <span className="label-caps flex-none">Category</span>
                       <select
                         value={tx.category_id ?? ""}
+                        aria-label="Category"
                         onChange={async (e) => {
                           const newCatId = e.target.value || null;
                           await supabase
@@ -1001,7 +1013,7 @@ export default function TransactionsPage() {
                             .eq("id", tx.id);
                           loadTransactions();
                         }}
-                        className="cursor-pointer rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)] focus:outline-none focus:ring-1 focus:ring-[var(--color-tertiary)]"
+                        className="pill-select min-w-0"
                         style={
                           tx.categories
                             ? {
@@ -1024,14 +1036,14 @@ export default function TransactionsPage() {
 
                     {tx.transaction_labels && tx.transaction_labels.length > 0 && (
                       <div className="space-y-2">
-                        <span className="font-label block text-[10px] text-[var(--color-secondary)]">
+                        <span className="label-caps block">
                           Labels
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {tx.transaction_labels.map((tl) => (
                             <span
                               key={tl.labels.id}
-                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              className="chip"
                               style={{
                                 backgroundColor: tl.labels.color + "20",
                                 color: tl.labels.color,
@@ -1046,32 +1058,32 @@ export default function TransactionsPage() {
 
                     {tx.notes && (
                       <div className="space-y-1">
-                        <span className="font-label block text-[10px] text-[var(--color-secondary)]">
+                        <span className="label-caps block">
                           Notes
                         </span>
-                        <p className="text-xs text-[var(--color-secondary)]">{tx.notes}</p>
+                        <p className="text-xs text-[var(--color-secondary)] wrap-anywhere">{tx.notes}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {tx.source !== "sync" && (
-                      <button onClick={() => openDuplicate(tx)} className="btn btn-secondary text-xs">
+                      <button onClick={() => openDuplicate(tx)} className="btn btn-secondary">
                         Copy
                       </button>
                     )}
                     {tx.type !== "transfer" && (
-                      <button onClick={() => openSplit(tx)} className="btn btn-secondary text-xs">
+                      <button onClick={() => openSplit(tx)} className="btn btn-secondary">
                         {tx.is_split ? "Edit split" : "Split"}
                       </button>
                     )}
-                    <button onClick={() => openEdit(tx)} className="btn btn-secondary text-xs">
+                    <button onClick={() => openEdit(tx)} className="btn btn-secondary">
                       {tx.source === "sync" ? "Categorize" : "Edit"}
                     </button>
                     {tx.source !== "sync" && (
                       <button
                         onClick={() => handleDelete(tx.id)}
-                        className="btn btn-danger-outline text-xs"
+                        className="btn btn-danger-outline"
                       >
                         Delete
                       </button>
@@ -1079,11 +1091,12 @@ export default function TransactionsPage() {
                   </div>
 
                   {tx.is_split && (
-                    <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] p-3">
+                    <div className="space-y-2 rounded-md border border-[var(--color-border)] bg-[rgba(26,28,30,0.02)] px-3 pb-3">
                       <button
                         type="button"
                         onClick={() => toggleExpand(tx)}
-                        className="flex w-full items-center justify-between text-xs font-medium text-[var(--color-primary)]"
+                        aria-expanded={Boolean(expandedParents[tx.id])}
+                        className="pressable tap-target flex w-full items-center justify-between text-xs font-medium text-[var(--color-primary)]"
                       >
                         <span>
                           {expandedParents[tx.id]
@@ -1091,8 +1104,9 @@ export default function TransactionsPage() {
                             : `Show splits${splitChildren[tx.id] ? ` (${splitChildren[tx.id].length})` : ""}`}
                         </span>
                         <ChevronDown
-                          size={14}
-                          className={`transition-transform ${expandedParents[tx.id] ? "" : "-rotate-90"}`}
+                          size={16}
+                          aria-hidden
+                          className={`transition-transform duration-150 ${expandedParents[tx.id] ? "" : "-rotate-90"}`}
                         />
                       </button>
                       {expandedParents[tx.id] && (splitChildren[tx.id] ?? []).map((child) => (
@@ -1102,14 +1116,14 @@ export default function TransactionsPage() {
                         >
                           <div className="flex min-w-0 items-center gap-2">
                             <span
-                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                              className="chip flex-none"
                               style={
                                 child.categories
                                   ? {
                                       backgroundColor: child.categories.color + "20",
                                       color: child.categories.color,
                                     }
-                                  : { backgroundColor: "rgba(108,114,120,0.12)", color: "#6C7278" }
+                                  : undefined
                               }
                             >
                               {child.categories?.name ?? "Uncategorized"}
@@ -1120,7 +1134,7 @@ export default function TransactionsPage() {
                               </span>
                             )}
                           </div>
-                          <span className="shrink-0 font-medium text-[var(--color-primary)]">
+                          <span className="shrink-0 font-medium tabular-nums text-[var(--color-primary)]">
                             {formatCurrency(Number(child.amount))}
                           </span>
                         </div>
@@ -1137,14 +1151,16 @@ export default function TransactionsPage() {
         <table className="hidden w-full text-sm md:table">
           <thead>
             <tr className="border-b border-[var(--color-border)] text-left">
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Date</th>
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Description</th>
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Account</th>
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Destination</th>
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Category</th>
-              <th className="font-label px-4 py-3 text-[11px] text-[var(--color-secondary)]">Labels</th>
-              <th className="font-label px-4 py-3 text-right text-[11px] text-[var(--color-secondary)]">Amount</th>
-              <th className="px-4 py-3"></th>
+              <th className="label-caps px-4 py-3">Date</th>
+              <th className="label-caps px-4 py-3">Description</th>
+              <th className="label-caps px-4 py-3">Account</th>
+              <th className="label-caps px-4 py-3">Destination</th>
+              <th className="label-caps px-4 py-3">Category</th>
+              <th className="label-caps px-4 py-3">Labels</th>
+              <th className="label-caps px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
@@ -1166,22 +1182,24 @@ export default function TransactionsPage() {
                 const children = splitChildren[tx.id] ?? [];
                 const rows: React.ReactNode[] = [];
                 rows.push(
-                <tr key={tx.id} className="hover:bg-[rgba(26,28,30,0.03)]">
+                <tr key={tx.id} className="transition-colors duration-150 hover:bg-[rgba(26,28,30,0.03)]">
                   <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
                     {formatDate(tx.date)}
                   </td>
-                  <td className="max-w-[180px] px-4 py-3 sm:max-w-[240px] md:max-w-[320px]">
+                  <td className="max-w-80 px-4 py-3">
                     <div className="flex items-start gap-2">
                       {tx.is_split && (
                         <button
                           type="button"
                           onClick={() => toggleExpand(tx)}
                           aria-label={isExpanded ? "Collapse splits" : "Expand splits"}
-                          className="btn btn-ghost mt-0.5 px-1 py-0.5"
+                          aria-expanded={isExpanded}
+                          className="btn btn-ghost btn-icon -my-2 -ml-2"
                         >
                           <ChevronDown
-                            size={14}
-                            className={`transition-transform ${isExpanded ? "" : "-rotate-90"}`}
+                            size={16}
+                            aria-hidden
+                            className={`transition-transform duration-150 ${isExpanded ? "" : "-rotate-90"}`}
                           />
                         </button>
                       )}
@@ -1193,8 +1211,8 @@ export default function TransactionsPage() {
                           {tx.description || "—"}
                         </p>
                         {tx.is_split && (
-                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-[rgba(58,79,102,0.10)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-info)]">
-                            <Split size={10} />
+                          <span className="chip chip-info mt-1">
+                            <Split size={12} aria-hidden />
                             Split
                           </span>
                         )}
@@ -1209,7 +1227,7 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div
-                        className="h-2 w-2 rounded-full"
+                        className="h-2 w-2 flex-none rounded-full"
                         style={{ backgroundColor: tx.accounts?.color }}
                       />
                       <span className="text-[var(--color-secondary)]">{tx.accounts?.name}</span>
@@ -1219,7 +1237,7 @@ export default function TransactionsPage() {
                     {tx.destination_account ? (
                       <div className="flex items-center gap-2">
                         <div
-                          className="h-2 w-2 rounded-full"
+                          className="h-2 w-2 flex-none rounded-full"
                           style={{ backgroundColor: tx.destination_account.color }}
                         />
                         <span className="text-[var(--color-secondary)]">
@@ -1233,6 +1251,7 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3">
                     <select
                       value={tx.category_id ?? ""}
+                      aria-label="Category"
                       onChange={async (e) => {
                         const newCatId = e.target.value || null;
                         await supabase
@@ -1241,7 +1260,7 @@ export default function TransactionsPage() {
                           .eq("id", tx.id);
                         loadTransactions();
                       }}
-                      className="cursor-pointer rounded-full border-0 bg-transparent px-2 py-0.5 text-xs font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)] focus:outline-none focus:ring-1 focus:ring-[var(--color-tertiary)]"
+                      className="pill-select"
                       style={
                         tx.categories
                           ? {
@@ -1266,7 +1285,7 @@ export default function TransactionsPage() {
                       {tx.transaction_labels?.map((tl) => (
                         <span
                           key={tl.labels.id}
-                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                          className="chip"
                           style={{
                             backgroundColor: tl.labels.color + "20",
                             color: tl.labels.color,
@@ -1277,7 +1296,7 @@ export default function TransactionsPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">
                     <span
                       className={amountClass(tx.type, filterAccount, tx.transfer_to_account_id)}
                     >
@@ -1285,41 +1304,44 @@ export default function TransactionsPage() {
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
+                  <td className="px-4 py-2">
+                    <div className="flex justify-end gap-1">
                       {tx.source !== "sync" && (
                         <button
                           onClick={() => openDuplicate(tx)}
                           aria-label="Copy transaction"
                           title="Copy transaction"
-                          className="btn btn-ghost px-2 py-1.5"
+                          className="btn btn-ghost btn-icon"
                         >
-                          <Copy size={14} />
+                          <Copy size={16} aria-hidden />
                         </button>
                       )}
                       {tx.type !== "transfer" && (
                         <button
                           onClick={() => openSplit(tx)}
+                          aria-label={tx.is_split ? "Edit split" : "Split transaction"}
                           title={tx.is_split ? "Edit split" : "Split transaction"}
-                          className="btn btn-ghost px-2 py-1.5"
+                          className="btn btn-ghost btn-icon"
                         >
-                          <Split size={14} />
+                          <Split size={16} aria-hidden />
                         </button>
                       )}
                       <button
                         onClick={() => openEdit(tx)}
+                        aria-label={tx.source === "sync" ? "Categorize transaction" : "Edit transaction"}
                         title={tx.source === "sync" ? "Categorize" : "Edit"}
-                        className="btn btn-ghost px-2 py-1.5"
+                        className="btn btn-ghost btn-icon"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={16} aria-hidden />
                       </button>
                       {tx.source !== "sync" && (
                         <button
                           onClick={() => handleDelete(tx.id)}
                           aria-label="Delete transaction"
-                          className="btn btn-ghost px-2 py-1.5 hover:!text-[var(--color-danger)]"
+                          title="Delete transaction"
+                          className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={16} aria-hidden />
                         </button>
                       )}
                     </div>
@@ -1334,14 +1356,14 @@ export default function TransactionsPage() {
                         <td className="px-4 py-2 pl-12 text-sm text-[var(--color-primary)]" colSpan={4}>
                           <div className="flex items-center gap-2">
                             <span
-                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                              className="chip"
                               style={
                                 child.categories
                                   ? {
                                       backgroundColor: child.categories.color + "20",
                                       color: child.categories.color,
                                     }
-                                  : { backgroundColor: "rgba(108,114,120,0.12)", color: "#6C7278" }
+                                  : undefined
                               }
                             >
                               {child.categories?.name ?? "Uncategorized"}
@@ -1358,7 +1380,7 @@ export default function TransactionsPage() {
                             {child.transaction_labels?.map((tl) => (
                               <span
                                 key={tl.labels.id}
-                                className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                className="chip"
                                 style={{
                                   backgroundColor: tl.labels.color + "20",
                                   color: tl.labels.color,
@@ -1369,7 +1391,7 @@ export default function TransactionsPage() {
                             ))}
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-medium text-[var(--color-secondary)]">
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-medium tabular-nums text-[var(--color-secondary)]">
                           {formatCurrency(Number(child.amount))}
                         </td>
                         <td className="px-4 py-2" />
@@ -1384,27 +1406,27 @@ export default function TransactionsPage() {
         </table>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[var(--color-border)] px-4 py-3">
-            <p className="text-xs text-[var(--color-secondary)]">
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] px-4 py-3">
+            <p className="text-xs tabular-nums text-[var(--color-secondary)]">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of{" "}
               {totalCount}
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-none gap-2">
               <button
                 disabled={page === 0}
                 onClick={() => setPage(page - 1)}
                 aria-label="Previous page"
-                className="btn btn-secondary px-2 py-1.5"
+                className="btn btn-secondary btn-icon"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={16} aria-hidden />
               </button>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(page + 1)}
                 aria-label="Next page"
-                className="btn btn-secondary px-2 py-1.5"
+                className="btn btn-secondary btn-icon"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={16} aria-hidden />
               </button>
             </div>
           </div>
@@ -1424,17 +1446,17 @@ export default function TransactionsPage() {
           <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-6">
             <section className="surface-card overflow-hidden rounded-md p-4 sm:p-5">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-label text-[11px] text-[var(--color-secondary)]">
+                <div className="min-w-0">
+                  <p className="label-caps">
                     {currentFlow.eyebrow}
                   </p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--color-primary)]">
+                  <h3 className="section-title mt-1">
                     {composerHeading}
                   </h3>
                   <p className="mt-1 text-sm text-[var(--color-secondary)]">{composerSubtitle}</p>
                 </div>
-                <div className="chip">
-                  <CalendarDays className="h-3.5 w-3.5" />
+                <div className="chip flex-none whitespace-nowrap">
+                  <CalendarDays className="h-3.5 w-3.5" aria-hidden />
                   {formatDate(form.date)}
                 </div>
               </div>
@@ -1466,10 +1488,11 @@ export default function TransactionsPage() {
                               : "",
                         });
                       }}
-                      className={`rounded-md border px-3 py-3 text-left transition ${
+                      aria-pressed={isActive}
+                      className={`pressable min-w-0 rounded-md border p-2 text-left sm:p-3 ${
                         isActive
                           ? TYPE_ACCENT_CLASS[option.accent]
-                          : "border-[var(--color-border)] bg-white text-[var(--color-secondary)] hover:bg-[rgba(26,28,30,0.04)]"
+                          : "border-[var(--color-border-strong)] bg-white text-[var(--color-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-primary)]"
                       }`}
                     >
                       <span
@@ -1477,10 +1500,10 @@ export default function TransactionsPage() {
                           isActive ? TYPE_ICON_CLASS[option.accent] : "bg-[rgba(26,28,30,0.06)] text-[var(--color-secondary)]"
                         }`}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4" aria-hidden />
                       </span>
-                      <span className="block text-sm font-semibold">{option.label}</span>
-                      <span className="mt-1 block text-[11px] text-current/80">{option.hint}</span>
+                      <span className="block truncate text-sm font-semibold">{option.label}</span>
+                      <span className="mt-1 block text-xs text-current/80">{option.hint}</span>
                     </button>
                   );
                 })}
@@ -1490,9 +1513,9 @@ export default function TransactionsPage() {
                 {currentFlow.steps.map((step, index) => (
                   <span
                     key={`${currentFlow.eyebrow}-${step}`}
-                    className="font-label inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-[10px] text-[var(--color-secondary)]"
+                    className="label-caps inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white py-1 pl-1 pr-3"
                   >
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] text-[var(--color-neutral)]">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-primary)] text-2xs text-[var(--color-neutral)]">
                       {index + 1}
                     </span>
                     {step}
@@ -1502,10 +1525,11 @@ export default function TransactionsPage() {
 
               <div className="mt-5 grid gap-4">
                 <div>
-                  <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                  <label htmlFor="composer-description" className="field-label">
                     {currentFlow.descriptionLabel}
                   </label>
                   <input
+                    id="composer-description"
                     type="text"
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -1513,16 +1537,17 @@ export default function TransactionsPage() {
                     placeholder={currentFlow.descriptionPlaceholder}
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                  <div>
-                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                <div className="grid gap-4 sm:grid-cols-5">
+                  <div className="sm:col-span-3">
+                    <label htmlFor="composer-amount" className="field-label">
                       {currentFlow.amountLabel}
                     </label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-[var(--color-secondary)]">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-[var(--color-secondary)]" aria-hidden>
                         €
                       </span>
                       <input
+                        id="composer-amount"
                         type="number"
                         step="0.01"
                         min="0.01"
@@ -1530,16 +1555,17 @@ export default function TransactionsPage() {
                         required
                         value={form.amount}
                         onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                        className="field pl-9 text-3xl font-semibold tracking-tight"
+                        className="field pl-9 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="composer-date" className="field-label">
                       Date
                     </label>
                     <input
+                      id="composer-date"
                       type="date"
                       required
                       value={form.date}
@@ -1553,10 +1579,10 @@ export default function TransactionsPage() {
 
             <section className="surface-card rounded-md p-4 sm:p-5">
               <div className="mb-4 flex items-start gap-3">
-                <div className="rounded-md bg-[rgba(26,28,30,0.06)] p-2.5 text-[var(--color-secondary)]">
-                  <Landmark className="h-4 w-4" />
+                <div className="flex-none rounded-md bg-[rgba(26,28,30,0.06)] p-2 text-[var(--color-secondary)]">
+                  <Landmark className="h-4 w-4" aria-hidden />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-base font-semibold text-[var(--color-primary)]">
                     {currentFlow.accountSectionTitle}
                   </h3>
@@ -1568,10 +1594,11 @@ export default function TransactionsPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                  <label htmlFor="composer-account" className="field-label">
                     {currentFlow.accountLabel}
                   </label>
                   <select
+                    id="composer-account"
                     required
                     value={form.account_id}
                     onChange={(e) =>
@@ -1602,10 +1629,11 @@ export default function TransactionsPage() {
 
                 {form.type === "transfer" ? (
                   <div>
-                    <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                    <label htmlFor="composer-destination" className="field-label">
                       {currentFlow.destinationLabel}
                     </label>
                     <select
+                      id="composer-destination"
                       value={form.transfer_to_account_id}
                       onChange={(e) =>
                         setForm({ ...form, transfer_to_account_id: e.target.value })
@@ -1627,7 +1655,7 @@ export default function TransactionsPage() {
                       </p>
                     )}
                     {selectedDestinationAccount?.account_mode === "automated" && (
-                      <p className="notice notice-warning mt-1 text-xs">
+                      <p className="notice notice-warning mt-2 text-xs">
                         ⚠️ This account is synced with a bank. The transfer may also be imported
                         automatically during sync, which could cause a duplicate.
                       </p>
@@ -1643,10 +1671,10 @@ export default function TransactionsPage() {
 
             <section className="surface-card space-y-4 rounded-md p-4 sm:p-5">
               <div className="flex items-start gap-3">
-                <div className="rounded-md bg-[rgba(26,28,30,0.06)] p-2.5 text-[var(--color-secondary)]">
-                  <Tags className="h-4 w-4" />
+                <div className="flex-none rounded-md bg-[rgba(26,28,30,0.06)] p-2 text-[var(--color-secondary)]">
+                  <Tags className="h-4 w-4" aria-hidden />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-base font-semibold text-[var(--color-primary)]">
                     {currentFlow.categorySectionTitle}
                   </h3>
@@ -1657,10 +1685,11 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                <label htmlFor="composer-category" className="field-label">
                   {currentFlow.categoryLabel}
                 </label>
                 <select
+                  id="composer-category"
                   value={form.category_id}
                   onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                   className="field"
@@ -1675,9 +1704,9 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                <p className="field-label">
                   {currentFlow.labelsLabel}
-                </label>
+                </p>
                 <LabelMultiSelect
                   labels={labels}
                   selectedIds={form.label_ids}
@@ -1686,10 +1715,11 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <label className="font-label mb-2 block text-[11px] text-[var(--color-secondary)]">
+                <label htmlFor="composer-notes" className="field-label">
                   {currentFlow.notesLabel}
                 </label>
                 <textarea
+                  id="composer-notes"
                   rows={3}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -1746,10 +1776,11 @@ export default function TransactionsPage() {
                   setPage(0);
                   setMobileFilterPicker(null);
                 }}
-                className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
+                aria-pressed={filterAccount === ""}
+                className="pressable tap-target flex w-full items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-left text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-hover)]"
               >
-                <span>All accounts</span>
-                {filterAccount === "" && <Check className="h-4 w-4 text-[var(--color-tertiary)]" />}
+                <span className="truncate">All accounts</span>
+                {filterAccount === "" && <Check className="h-4 w-4 flex-none text-[var(--color-tertiary)]" aria-hidden />}
               </button>
               {accounts.map((account) => (
                 <button
@@ -1760,11 +1791,12 @@ export default function TransactionsPage() {
                     setPage(0);
                     setMobileFilterPicker(null);
                   }}
-                  className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
+                  aria-pressed={filterAccount === account.id}
+                  className="pressable tap-target flex w-full items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-left text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-hover)]"
                 >
-                  <span>{account.name}</span>
+                  <span className="truncate">{account.name}</span>
                   {filterAccount === account.id && (
-                    <Check className="h-4 w-4 text-[var(--color-tertiary)]" />
+                    <Check className="h-4 w-4 flex-none text-[var(--color-tertiary)]" aria-hidden />
                   )}
                 </button>
               ))}
@@ -1780,10 +1812,11 @@ export default function TransactionsPage() {
                   setPage(0);
                   setMobileFilterPicker(null);
                 }}
-                className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
+                aria-pressed={filterCategory === ""}
+                className="pressable tap-target flex w-full items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-left text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-hover)]"
               >
-                <span>All categories</span>
-                {filterCategory === "" && <Check className="h-4 w-4 text-[var(--color-tertiary)]" />}
+                <span className="truncate">All categories</span>
+                {filterCategory === "" && <Check className="h-4 w-4 flex-none text-[var(--color-tertiary)]" aria-hidden />}
               </button>
               {categories.map((category) => (
                 <button
@@ -1794,11 +1827,12 @@ export default function TransactionsPage() {
                     setPage(0);
                     setMobileFilterPicker(null);
                   }}
-                  className="flex w-full items-center justify-between rounded-md border border-[var(--color-border)] bg-white px-4 py-3 text-left text-sm font-medium text-[var(--color-primary)] transition hover:bg-[rgba(26,28,30,0.04)]"
+                  aria-pressed={filterCategory === category.id}
+                  className="pressable tap-target flex w-full items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-white px-4 py-2 text-left text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-hover)]"
                 >
-                  <span>{category.name}</span>
+                  <span className="truncate">{category.name}</span>
                   {filterCategory === category.id && (
-                    <Check className="h-4 w-4 text-[var(--color-tertiary)]" />
+                    <Check className="h-4 w-4 flex-none text-[var(--color-tertiary)]" aria-hidden />
                   )}
                 </button>
               ))}

@@ -94,8 +94,8 @@ export default function SelectBankAccountsPage() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <p className="font-label text-[11px] text-[var(--color-secondary)]">Linking</p>
-        <h1 className="mt-1 text-2xl font-semibold text-[var(--color-primary)] sm:text-3xl">
+        <p className="label-caps">Linking</p>
+        <h1 className="page-title mt-1">
           Select Bank Accounts
         </h1>
         <p className="mt-1 text-sm text-[var(--color-secondary)]">
@@ -110,20 +110,29 @@ export default function SelectBankAccountsPage() {
           return (
             <Card
               key={account.uid}
+              role="checkbox"
+              aria-checked={isSelected}
+              tabIndex={0}
               onClick={() => toggleAccount(account.uid)}
-              className={`cursor-pointer transition ${
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleAccount(account.uid);
+                }
+              }}
+              className={`pressable cursor-pointer ${
                 isSelected
-                  ? "!border-[var(--color-tertiary)] !bg-[rgba(184,66,46,0.06)]"
-                  : "hover:!border-[var(--color-border-strong)]"
+                  ? "border-[var(--color-tertiary)] bg-[rgba(184,66,46,0.06)]"
+                  : "hover:border-[var(--color-border-hover)]"
               }`}
             >
               <div className="flex items-center gap-3">
                 {isSelected ? (
-                  <CheckCircle2 className="h-5 w-5 text-[var(--color-tertiary)]" />
+                  <CheckCircle2 className="h-5 w-5 flex-none text-[var(--color-tertiary)]" aria-hidden />
                 ) : (
-                  <Circle className="h-5 w-5 text-[var(--color-secondary)]" />
+                  <Circle className="h-5 w-5 flex-none text-[var(--color-secondary)]" aria-hidden />
                 )}
-                <Landmark className="h-5 w-5 text-[var(--color-secondary)]" />
+                <Landmark className="h-5 w-5 flex-none text-[var(--color-secondary)]" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-[var(--color-primary)]">
                     {account.name || "Account"}

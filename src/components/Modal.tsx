@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,8 @@ export default function Modal({
   mobileSheet = false,
   bodyClassName,
 }: ModalProps) {
+  const titleId = useId();
+
   if (!open) return null;
 
   return (
@@ -31,24 +34,30 @@ export default function Modal({
         mobileSheet ? "items-end sm:items-center" : "items-center px-4"
       )}
     >
-      <div className="fixed inset-0 bg-[rgba(26,28,30,0.48)]" onClick={onClose} />
+      <div className="fixed inset-0 bg-[rgba(26,28,30,0.48)]" onClick={onClose} aria-hidden />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "surface-card-strong relative z-10 flex w-full flex-col overflow-hidden",
           mobileSheet
-            ? "h-[100dvh] max-h-[100dvh] rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-md"
-            : "max-h-[90vh] rounded-md",
+            ? "h-dvh max-h-dvh rounded-none sm:h-auto sm:max-h-[90dvh] sm:rounded-md"
+            : "max-h-[90dvh] rounded-md",
           size === "sm" && "sm:max-w-sm",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-2xl"
         )}
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-4 sm:px-6">
-          <h2 className="text-lg font-semibold text-[var(--color-primary)]">{title}</h2>
+        <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] py-3 pl-4 pr-2 sm:pl-6 sm:pr-4">
+          <h2 id={titleId} className="min-w-0 truncate text-lg font-semibold text-[var(--color-primary)]">
+            {title}
+          </h2>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
-            className="btn btn-ghost px-2 py-2"
+            className="btn btn-ghost btn-icon"
           >
             <X size={20} />
           </button>
