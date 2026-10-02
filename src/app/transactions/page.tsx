@@ -23,9 +23,11 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Search,
   Split,
   Tags,
   Trash2,
+  X,
 } from "lucide-react";
 import type { Account, Category, Label, TransactionWithRelations } from "@/lib/database.types";
 
@@ -251,6 +253,18 @@ export default function TransactionsPage() {
     Boolean(accountParam || categoryParam || typeParam || fromParam || toParam)
   );
   const [showBalances, setShowBalances] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const next = searchInput.trim();
+    if (next === searchTerm) return;
+    const handle = setTimeout(() => {
+      setSearchTerm(next);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchInput, searchTerm]);
 
   useEffect(() => {
     setFilterAccount(accountParam);
@@ -279,12 +293,15 @@ export default function TransactionsPage() {
   const loadTransactions = useCallback(async () => {
     setLoadError("");
 
-    let query = supabase
-      .from("transactions")
-      .select(
-        "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), destination_account:accounts!transactions_transfer_to_account_id_fkey(*), transaction_labels(labels(*))",
-        { count: "exact" }
-      )
+    const columns =
+      "*, categories(*), accounts:accounts!transactions_account_id_fkey(*), destination_account:accounts!transactions_transfer_to_account_id_fkey(*), transaction_labels(labels(*))";
+    let query = (
+      searchTerm
+        ? supabase
+            .rpc("search_transactions", { p_query: searchTerm }, { count: "exact" })
+            .select(columns)
+        : supabase.from("transactions").select(columns, { count: "exact" })
+    )
       .is("parent_transaction_id", null)
       .order("date", { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
@@ -312,7 +329,7 @@ export default function TransactionsPage() {
     if (data) setTransactions(data as unknown as TransactionWithRelations[]);
     if (count !== null) setTotalCount(count);
     setLoading(false);
-  }, [page, filterAccount, filterCategory, filterType, filterDateFrom, filterDateTo]);
+  }, [page, searchTerm, filterAccount, filterCategory, filterType, filterDateFrom, filterDateTo]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -743,6 +760,34 @@ export default function TransactionsPage() {
             New expense
           </button>
         </div>
+      </div>
+
+      <div className="relative">
+        <Search
+          size={16}
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-secondary)]"
+        />
+        <input
+          type="text"
+          inputMode="search"
+          enterKeyHint="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by description..."
+          aria-label="Search transactions by description"
+          className="field pl-9 pr-12"
+        />
+        {searchInput && (
+          <button
+            type="button"
+            onClick={() => setSearchInput("")}
+            aria-label="Clear search"
+            className="btn btn-ghost btn-icon absolute right-0 top-1/2 -translate-y-1/2"
+          >
+            <X size={16} aria-hidden />
+          </button>
+        )}
       </div>
 
       {showFilters && (

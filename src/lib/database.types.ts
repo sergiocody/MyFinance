@@ -57,6 +57,10 @@ export type Database = {
         Args: { p_parent_id: string };
         Returns: undefined;
       };
+      search_transactions: {
+        Args: { p_query: string };
+        Returns: Database["public"]["Tables"]["transactions"]["Row"][];
+      };
       set_bank_connection_error: {
         Args: {
           p_connection_id: string;
