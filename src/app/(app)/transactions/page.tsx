@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import { LabelMultiSelect } from "@/components/LabelMultiSelect";
@@ -113,7 +114,7 @@ const FLOW_CONTENT: Record<
     subtitle: "Capture what you spent, where it came from, and optionally organize it.",
     steps: ["What happened", "Paid from", "Organize"],
     descriptionLabel: "What was it for?",
-    descriptionPlaceholder: "Groceries, coffee, utilities, rent...",
+    descriptionPlaceholder: "Groceries, coffee, utilities, rent…",
     amountLabel: "Amount spent",
     accountSectionTitle: "Payment account",
     accountSectionDescription: "Choose the account or wallet that paid for this expense.",
@@ -126,7 +127,7 @@ const FLOW_CONTENT: Record<
     labelsLabel: "Expense labels",
     notesLabel: "Notes",
     notesPlaceholder: "Add a reminder, merchant, or context if useful.",
-    submitLabel: "Save expense",
+    submitLabel: "Save Expense",
   },
   income: {
     eyebrow: "Income Flow",
@@ -134,7 +135,7 @@ const FLOW_CONTENT: Record<
     subtitle: "Log incoming money, select where it lands, and classify it if needed.",
     steps: ["Source", "Deposit into", "Classify"],
     descriptionLabel: "Where did it come from?",
-    descriptionPlaceholder: "Salary, invoice, refund, interest...",
+    descriptionPlaceholder: "Salary, invoice, refund, interest…",
     amountLabel: "Amount received",
     accountSectionTitle: "Destination account",
     accountSectionDescription: "Choose the account where this income is deposited.",
@@ -147,7 +148,7 @@ const FLOW_CONTENT: Record<
     labelsLabel: "Income labels",
     notesLabel: "Notes",
     notesPlaceholder: "Optional details such as client, invoice number, or source.",
-    submitLabel: "Save income",
+    submitLabel: "Save Income",
   },
   transfer: {
     eyebrow: "Transfer Flow",
@@ -155,7 +156,7 @@ const FLOW_CONTENT: Record<
     subtitle: "Pick the source, pick the destination, and save. The rest is optional.",
     steps: ["Amount", "From and to", "Optional details"],
     descriptionLabel: "Transfer note",
-    descriptionPlaceholder: "Savings top-up, card repayment, cash withdrawal...",
+    descriptionPlaceholder: "Savings top-up, card repayment, cash withdrawal…",
     amountLabel: "Amount moved",
     accountSectionTitle: "Transfer accounts",
     accountSectionDescription: "Select the source account first, then the destination account.",
@@ -168,7 +169,7 @@ const FLOW_CONTENT: Record<
     labelsLabel: "Transfer labels",
     notesLabel: "Notes",
     notesPlaceholder: "Optional context such as why you moved the funds.",
-    submitLabel: "Save transfer",
+    submitLabel: "Save Transfer",
   },
 };
 
@@ -188,7 +189,7 @@ function buildEmptyForm(accounts: Account[], type: TransactionFlowType) {
     amount: "",
     description: "",
     notes: "",
-    date: new Date().toISOString().split("T")[0],
+    date: format(new Date(), "yyyy-MM-dd"),
     label_ids: [] as string[],
     transfer_to_account_id: "",
   };
@@ -272,11 +273,15 @@ export default function TransactionsPage() {
     setFilterType(typeParam);
     setFilterDateFrom(fromParam);
     setFilterDateTo(toParam);
-    setShowFilters(Boolean(accountParam || categoryParam || typeParam || fromParam || toParam));
+    // Only auto-open: clearing the last filter from the panel must not collapse it.
+    if (accountParam || categoryParam || typeParam || fromParam || toParam) setShowFilters(true);
     setPage(0);
   }, [accountParam, categoryParam, typeParam, fromParam, toParam]);
   const [formError, setFormError] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionStatus, setActionStatus] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     account_id: "",
@@ -285,7 +290,7 @@ export default function TransactionsPage() {
     amount: "",
     description: "",
     notes: "",
-    date: new Date().toISOString().split("T")[0],
+    date: format(new Date(), "yyyy-MM-dd"),
     label_ids: [] as string[],
     transfer_to_account_id: "",
   });
@@ -417,25 +422,41 @@ export default function TransactionsPage() {
     setModalOpen(true);
   }
 
+  function showFormError(message: string, fieldId: string) {
+    setFormError(message);
+    document.getElementById(fieldId)?.focus();
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setFormError("");
     const amount = parseFloat(form.amount);
-    if (!amount || !form.account_id) {
-      setFormError("Add an amount and select an account.");
+    if (!amount) {
+      showFormError("Enter an amount greater than zero.", "composer-amount");
+      return;
+    }
+
+    if (!form.account_id) {
+      showFormError("Select the account for this transaction.", "composer-account");
       return;
     }
 
     if (form.type === "transfer" && !form.transfer_to_account_id) {
-      setFormError("Choose the destination account for this transfer.");
+      showFormError("Choose the destination account for this transfer.", "composer-destination");
       return;
     }
 
     if (form.type === "transfer" && form.transfer_to_account_id === form.account_id) {
-      setFormError("Origin and destination accounts must be different.");
+      showFormError("Origin and destination accounts must be different.", "composer-destination");
       return;
     }
 
+    setSaving(true);
+    await persistTransaction(amount).finally(() => setSaving(false));
+  }
+
+  async function persistTransaction(amount: number) {
     const isSyncedEdit = editing && editing.source === "sync";
 
     if (isSyncedEdit) {
@@ -452,18 +473,23 @@ export default function TransactionsPage() {
         .eq("id", editing.id);
 
       if (error) {
-        setFormError(error.message);
+        setFormError(`The transaction could not be saved (${error.message}). Check the details and try again.`);
         return;
       }
 
       await supabase.from("transaction_labels").delete().eq("transaction_id", editing.id);
       if (form.label_ids.length > 0) {
-        await supabase.from("transaction_labels").insert(
+        const { error: labelError } = await supabase.from("transaction_labels").insert(
           form.label_ids.map((lid) => ({
             transaction_id: editing.id,
             label_id: lid,
           }))
         );
+
+        if (labelError) {
+          setFormError(`The transaction was saved but its labels were not (${labelError.message}). Try saving again.`);
+          return;
+        }
       }
 
       setModalOpen(false);
@@ -504,7 +530,7 @@ export default function TransactionsPage() {
           ? composerMode === "duplicate"
             ? "This copy matches an existing transaction exactly. Change at least one key detail before saving it as a new row."
             : "A matching transaction already exists for this account."
-          : transactionResponse.error.message
+          : `The transaction could not be saved (${transactionResponse.error.message}). Check the details and try again.`
       );
       return;
     }
@@ -524,7 +550,7 @@ export default function TransactionsPage() {
       );
 
       if (error) {
-        setFormError(error.message);
+        setFormError(`The transaction was saved but its labels were not (${error.message}). Edit it to add the labels again.`);
         return;
       }
     }
@@ -535,10 +561,50 @@ export default function TransactionsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this transaction?")) return;
-    await supabase.from("transactions").delete().eq("id", id);
+    if (!confirm("Delete this transaction? This cannot be undone.")) return;
+    setActionError("");
+    const { error } = await supabase.from("transactions").delete().eq("id", id);
+    if (error) {
+      setActionError(`The transaction could not be deleted (${error.message}). Try again.`);
+      return;
+    }
     loadTransactions();
     void loadRefs();
+  }
+
+  async function updateTransactionCategory(id: string, categoryId: string | null) {
+    setActionError("");
+    const { error } = await supabase
+      .from("transactions")
+      .update({ category_id: categoryId })
+      .eq("id", id);
+    if (error) {
+      setActionError(`The category could not be changed (${error.message}). Try again.`);
+    }
+    loadTransactions();
+  }
+
+  function updateFilters(patch: {
+    account?: string;
+    category?: string;
+    type?: TransactionFilterType;
+    from?: string;
+    to?: string;
+  }) {
+    if (patch.account !== undefined) setFilterAccount(patch.account);
+    if (patch.category !== undefined) setFilterCategory(patch.category);
+    if (patch.type !== undefined) setFilterType(patch.type);
+    if (patch.from !== undefined) setFilterDateFrom(patch.from);
+    if (patch.to !== undefined) setFilterDateTo(patch.to);
+    setPage(0);
+
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `/transactions?${nextQuery}` : "/transactions", { scroll: false });
   }
 
   function openSplit(tx: TransactionWithRelations) {
@@ -580,6 +646,7 @@ export default function TransactionsPage() {
     if (uncategorized.length === 0) return;
 
     setCategorizing(true);
+    setActionStatus("");
 
     const { data: categorized } = await supabase
       .from("transactions")
@@ -589,6 +656,7 @@ export default function TransactionsPage() {
 
     if (!categorized || categorized.length === 0) {
       setCategorizing(false);
+      setActionStatus("No categorized history to learn from yet. Categorize a few transactions manually first.");
       return;
     }
 
@@ -614,25 +682,30 @@ export default function TransactionsPage() {
       if (best) bestCat.set(desc, best);
     }
 
+    let updated = 0;
     for (const tx of uncategorized) {
       const key = (tx.description ?? "").trim().toLowerCase();
       const matchedCat = bestCat.get(key);
       if (matchedCat) {
-        await supabase.from("transactions").update({ category_id: matchedCat }).eq("id", tx.id);
+        const { error } = await supabase
+          .from("transactions")
+          .update({ category_id: matchedCat })
+          .eq("id", tx.id);
+        if (!error) updated += 1;
       }
     }
 
     setCategorizing(false);
+    setActionStatus(
+      updated > 0
+        ? `Categorized ${updated} of ${uncategorized.length} transactions on this page.`
+        : "No matches found. Categorize similar transactions manually to teach Auto-Categorize."
+    );
     loadTransactions();
   }
 
   function resetFilters() {
-    setFilterAccount("");
-    setFilterCategory("");
-    setFilterType("");
-    setFilterDateFrom("");
-    setFilterDateTo("");
-    setPage(0);
+    updateFilters({ account: "", category: "", type: "", from: "", to: "" });
   }
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -686,9 +759,9 @@ export default function TransactionsPage() {
         : currentFlow.subtitle;
   const composerSubmitLabel =
     composerMode === "edit"
-      ? "Save changes"
+      ? "Save Changes"
       : composerMode === "duplicate"
-        ? "Create copied transaction"
+        ? "Create Copy"
         : currentFlow.submitLabel;
 
   return (
@@ -746,7 +819,7 @@ export default function TransactionsPage() {
             className="btn btn-secondary"
           >
             <Tags size={16} className={categorizing ? "animate-pulse" : ""} aria-hidden />
-            Auto-cat
+            {categorizing ? "Categorizing…" : "Auto-Categorize"}
           </button>
           <button
             onClick={() => openCreate("expense")}
@@ -757,7 +830,7 @@ export default function TransactionsPage() {
             )}
           >
             <Plus size={16} aria-hidden />
-            New expense
+            New Expense
           </button>
         </div>
       </div>
@@ -770,11 +843,13 @@ export default function TransactionsPage() {
         />
         <input
           type="text"
+          name="transaction-search"
           inputMode="search"
           enterKeyHint="search"
+          autoComplete="off"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by description..."
+          placeholder="Search by description…"
           aria-label="Search transactions by description"
           className="field pl-9 pr-12"
         />
@@ -809,8 +884,8 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          <div>
-            <p className="field-label">Type</p>
+          <div role="group" aria-labelledby="filter-type-label">
+            <p id="filter-type-label" className="field-label">Type</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {FILTER_TYPE_OPTIONS.map((option) => {
                 const isActive = filterType === option.value;
@@ -818,10 +893,7 @@ export default function TransactionsPage() {
                   <button
                     key={option.label}
                     type="button"
-                    onClick={() => {
-                      setFilterType(option.value as TransactionFilterType);
-                      setPage(0);
-                    }}
+                    onClick={() => updateFilters({ type: option.value as TransactionFilterType })}
                     aria-pressed={isActive}
                     className={`pressable tap-target rounded-md border px-3 text-sm font-medium ${
                       isActive
@@ -838,23 +910,22 @@ export default function TransactionsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="field-label">
+              <label id="filter-account-label" htmlFor="filter-account" className="field-label">
                 Account
               </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("account")}
+                aria-labelledby="filter-account-label filter-account-value"
                 className="field flex w-full items-center justify-between gap-2 text-left sm:hidden"
               >
-                <span className="truncate">{selectedFilterAccountName}</span>
-                <span className="label-caps flex-none">Choose</span>
+                <span id="filter-account-value" className="truncate">{selectedFilterAccountName}</span>
+                <span className="label-caps flex-none" aria-hidden>Choose</span>
               </button>
               <select
+                id="filter-account"
                 value={filterAccount}
-                onChange={(e) => {
-                  setFilterAccount(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => updateFilters({ account: e.target.value })}
                 className="field hidden sm:block"
               >
                 <option value="">All accounts</option>
@@ -867,23 +938,22 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <label className="field-label">
+              <label id="filter-category-label" htmlFor="filter-category" className="field-label">
                 Category
               </label>
               <button
                 type="button"
                 onClick={() => setMobileFilterPicker("category")}
+                aria-labelledby="filter-category-label filter-category-value"
                 className="field flex w-full items-center justify-between gap-2 text-left sm:hidden"
               >
-                <span className="truncate">{selectedFilterCategoryName}</span>
-                <span className="label-caps flex-none">Choose</span>
+                <span id="filter-category-value" className="truncate">{selectedFilterCategoryName}</span>
+                <span className="label-caps flex-none" aria-hidden>Choose</span>
               </button>
               <select
+                id="filter-category"
                 value={filterCategory}
-                onChange={(e) => {
-                  setFilterCategory(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => updateFilters({ category: e.target.value })}
                 className="field hidden sm:block"
               >
                 <option value="">All categories</option>
@@ -905,10 +975,7 @@ export default function TransactionsPage() {
                 id="filter-from"
                 type="date"
                 value={filterDateFrom}
-                onChange={(e) => {
-                  setFilterDateFrom(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => updateFilters({ from: e.target.value })}
                 className="field"
               />
             </div>
@@ -921,10 +988,7 @@ export default function TransactionsPage() {
                 id="filter-to"
                 type="date"
                 value={filterDateTo}
-                onChange={(e) => {
-                  setFilterDateTo(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => updateFilters({ to: e.target.value })}
                 className="field"
               />
             </div>
@@ -969,17 +1033,36 @@ export default function TransactionsPage() {
         </Card>
       )}
 
+      {actionError && (
+        <div role="alert" className="notice notice-danger">
+          {actionError}
+        </div>
+      )}
+
+      {actionStatus && <p className="notice">{actionStatus}</p>}
+
+      <p role="status" className="sr-only">
+        {actionStatus}
+      </p>
+
+      <p role="status" className="sr-only">
+        {loading ? "" : `${totalCount} transaction${totalCount === 1 ? "" : "s"} found`}
+      </p>
+
       <Card className="overflow-x-auto p-0!">
         {loadError && (
-          <div className="border-b border-[var(--color-border)] bg-[rgba(184,66,46,0.06)] px-4 py-3 text-sm text-[var(--color-danger)]">
-            Failed to load transactions: {loadError}
+          <div
+            role="alert"
+            className="border-b border-[var(--color-border)] bg-[rgba(184,66,46,0.06)] px-4 py-3 text-sm text-[var(--color-danger)]"
+          >
+            Transactions could not be loaded ({loadError}). Reload the page or clear the filters and try again.
           </div>
         )}
 
         {/* Mobile: card list */}
         <div className="md:hidden">
           {loading ? (
-            <div className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">Loading...</div>
+            <div role="status" className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">Loading…</div>
           ) : transactions.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
               No transactions found
@@ -1049,15 +1132,8 @@ export default function TransactionsPage() {
                       <span className="label-caps flex-none">Category</span>
                       <select
                         value={tx.category_id ?? ""}
-                        aria-label="Category"
-                        onChange={async (e) => {
-                          const newCatId = e.target.value || null;
-                          await supabase
-                            .from("transactions")
-                            .update({ category_id: newCatId })
-                            .eq("id", tx.id);
-                          loadTransactions();
-                        }}
+                        aria-label={`Category for ${tx.description || "untitled transaction"}`}
+                        onChange={(e) => void updateTransactionCategory(tx.id, e.target.value || null)}
                         className="pill-select min-w-0"
                         style={
                           tx.categories
@@ -1212,7 +1288,7 @@ export default function TransactionsPage() {
             {loading ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
-                  Loading...
+                  <span role="status">Loading…</span>
                 </td>
               </tr>
             ) : transactions.length === 0 ? (
@@ -1275,7 +1351,9 @@ export default function TransactionsPage() {
                         className="h-2 w-2 flex-none rounded-full"
                         style={{ backgroundColor: tx.accounts?.color }}
                       />
-                      <span className="text-[var(--color-secondary)]">{tx.accounts?.name}</span>
+                      <span className="block max-w-48 truncate text-[var(--color-secondary)]" title={tx.accounts?.name}>
+                        {tx.accounts?.name}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -1296,15 +1374,8 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3">
                     <select
                       value={tx.category_id ?? ""}
-                      aria-label="Category"
-                      onChange={async (e) => {
-                        const newCatId = e.target.value || null;
-                        await supabase
-                          .from("transactions")
-                          .update({ category_id: newCatId })
-                          .eq("id", tx.id);
-                        loadTransactions();
-                      }}
+                      aria-label={`Category for ${tx.description || "untitled transaction"}`}
+                      onChange={(e) => void updateTransactionCategory(tx.id, e.target.value || null)}
                       className="pill-select"
                       style={
                         tx.categories
@@ -1701,7 +1772,7 @@ export default function TransactionsPage() {
                     )}
                     {selectedDestinationAccount?.account_mode === "automated" && (
                       <p className="notice notice-warning mt-2 text-xs">
-                        ⚠️ This account is synced with a bank. The transfer may also be imported
+                        <span aria-hidden>⚠️</span> This account is synced with a bank. The transfer may also be imported
                         automatically during sync, which could cause a duplicate.
                       </p>
                     )}
@@ -1749,10 +1820,11 @@ export default function TransactionsPage() {
               </div>
 
               <div>
-                <p className="field-label">
+                <p id="composer-labels-label" className="field-label">
                   {currentFlow.labelsLabel}
                 </p>
                 <LabelMultiSelect
+                  labelledBy="composer-labels-label"
                   labels={labels}
                   selectedIds={form.label_ids}
                   onChange={(labelIds) => setForm({ ...form, label_ids: labelIds })}
@@ -1774,7 +1846,11 @@ export default function TransactionsPage() {
               </div>
             </section>
 
-            {formError && <div className="notice notice-danger">{formError}</div>}
+            {formError && (
+              <div role="alert" className="notice notice-danger">
+                {formError}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-[var(--color-border)] bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
@@ -1786,8 +1862,8 @@ export default function TransactionsPage() {
               >
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary">
-                {composerSubmitLabel}
+              <button type="submit" disabled={saving} className="btn btn-primary">
+                {saving ? "Saving…" : composerSubmitLabel}
               </button>
             </div>
           </div>
@@ -1807,7 +1883,7 @@ export default function TransactionsPage() {
       <Modal
         open={mobileFilterPicker !== null}
         onClose={() => setMobileFilterPicker(null)}
-        title={mobileFilterPicker === "account" ? "Choose account" : "Choose category"}
+        title={mobileFilterPicker === "account" ? "Choose Account" : "Choose Category"}
         size="sm"
         mobileSheet
       >
@@ -1817,8 +1893,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setFilterAccount("");
-                  setPage(0);
+                  updateFilters({ account: "" });
                   setMobileFilterPicker(null);
                 }}
                 aria-pressed={filterAccount === ""}
@@ -1832,8 +1907,7 @@ export default function TransactionsPage() {
                   key={account.id}
                   type="button"
                   onClick={() => {
-                    setFilterAccount(account.id);
-                    setPage(0);
+                    updateFilters({ account: account.id });
                     setMobileFilterPicker(null);
                   }}
                   aria-pressed={filterAccount === account.id}
@@ -1853,8 +1927,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setFilterCategory("");
-                  setPage(0);
+                  updateFilters({ category: "" });
                   setMobileFilterPicker(null);
                 }}
                 aria-pressed={filterCategory === ""}
@@ -1868,8 +1941,7 @@ export default function TransactionsPage() {
                   key={category.id}
                   type="button"
                   onClick={() => {
-                    setFilterCategory(category.id);
-                    setPage(0);
+                    updateFilters({ category: category.id });
                     setMobileFilterPicker(null);
                   }}
                   aria-pressed={filterCategory === category.id}

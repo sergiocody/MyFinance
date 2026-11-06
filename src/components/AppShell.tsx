@@ -17,7 +17,8 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
             Supabase configuration missing
           </h1>
           <p className="mt-3 text-sm text-[var(--color-secondary)]">
-            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY before using the app.
+            Set <code translate="no">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+            <code translate="no">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> before using the app.
           </p>
         </div>
       </div>
@@ -42,8 +43,14 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <a
+        href="#main"
+        className="btn btn-ink sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]"
+      >
+        Skip to Content
+      </a>
       <Sidebar />
-      <main className="app-content min-h-screen lg:pl-64">
+      <main id="main" tabIndex={-1} className="app-content min-h-screen focus:outline-none lg:pl-64">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">{children}</div>
       </main>
     </>

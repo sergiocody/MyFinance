@@ -52,7 +52,16 @@
 @layer base {
   html {
     background: var(--color-neutral);
+    color-scheme: light;
     -webkit-text-size-adjust: 100%;
+    /* Keeps focused/anchored content clear of the fixed 60px mobile top bar. */
+    scroll-padding-top: 4.5rem;
+  }
+
+  @media (width >= 64rem) {
+    html {
+      scroll-padding-top: 1rem;
+    }
   }
 
   body {
@@ -71,6 +80,11 @@
 
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  a, button, input, select, textarea, label, summary, [role="button"] {
+    touch-action: manipulation;
   }
 
   button:not(:disabled),
@@ -392,9 +406,9 @@
     text-align: left;
   }
 
-  .field:focus {
+  .field:focus-visible {
     border-color: var(--color-tertiary);
-    box-shadow: 0 0 0 3px rgba(184, 66, 46, 0.16);
+    box-shadow: 0 0 0 3px rgba(184, 66, 46, 0.24);
   }
 
   .field:disabled {
@@ -421,7 +435,7 @@
   }
 
   @media (hover: hover) {
-    .field:hover:not(:disabled):not(:focus) {
+    .field:hover:not(:disabled):not(:focus-visible) {
       border-color: var(--color-border-hover);
     }
   }
@@ -445,6 +459,12 @@
   .pill-select:focus-visible {
     outline: 2px solid var(--color-tertiary);
     outline-offset: 2px;
+  }
+
+  /* Explicit option colors so the native popup stays legible under OS dark/forced modes. */
+  .pill-select option {
+    background-color: #ffffff;
+    color: var(--color-primary);
   }
 
   @media (pointer: fine) {
@@ -569,6 +589,19 @@
     .pressable:active:not(:disabled),
     .swatch:hover {
       transform: none;
+    }
+  }
+}
+
+@layer utilities {
+  /* Spinners stay as a slow loading cue; decorative pulses stop entirely. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin {
+      animation-duration: 2.5s;
+    }
+
+    .animate-pulse {
+      animation: none;
     }
   }
 }

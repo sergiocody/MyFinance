@@ -25,7 +25,8 @@ export default function AuthScreen() {
     setNotice("");
 
     if (isSignUpMode && password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("Passwords do not match. Re-enter the same password in both fields.");
+      document.getElementById("auth-confirm-password")?.focus();
       return;
     }
 
@@ -91,7 +92,7 @@ export default function AuthScreen() {
             </button>
           </div>
         ) : (
-          <div className="notice notice-danger mb-6">
+          <div className="notice notice-info mb-6">
             Invite-only access is enabled. Create your owner account in Supabase Auth, then sign in here.
           </div>
         )}
@@ -101,8 +102,14 @@ export default function AuthScreen() {
             <label htmlFor="auth-email" className="field-label">Email</label>
             <input
               id="auth-email"
+              name="email"
               type="email"
               required
+              autoComplete="email"
+              spellCheck={false}
+              autoCapitalize="none"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "auth-error" : undefined}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="field"
@@ -114,9 +121,13 @@ export default function AuthScreen() {
             <label htmlFor="auth-password" className="field-label">Password</label>
             <input
               id="auth-password"
+              name="password"
               type="password"
               required
               minLength={8}
+              autoComplete={isSignUpMode ? "new-password" : "current-password"}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "auth-error" : undefined}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="field"
@@ -129,9 +140,13 @@ export default function AuthScreen() {
               <label htmlFor="auth-confirm-password" className="field-label">Confirm Password</label>
               <input
                 id="auth-confirm-password"
+                name="confirm-password"
                 type="password"
                 required
                 minLength={8}
+                autoComplete="new-password"
+                aria-invalid={error && password !== confirmPassword ? true : undefined}
+                aria-describedby={error ? "auth-error" : undefined}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 className="field"
@@ -140,15 +155,25 @@ export default function AuthScreen() {
             </div>
           )}
 
-          {error && <div className="notice notice-danger">{error}</div>}
-          {notice && <div className="notice">{notice}</div>}
+          {error && (
+            <div id="auth-error" role="alert" className="notice notice-danger">
+              {error}
+            </div>
+          )}
+          <div role="status">{notice && <div className="notice">{notice}</div>}</div>
 
           <button
             type="submit"
             disabled={isPending}
             className="btn btn-primary w-full font-semibold"
           >
-            {isPending ? "Please wait..." : isSignUpMode ? "Create Account" : "Sign In"}
+            {isPending
+              ? isSignUpMode
+                ? "Creating Account…"
+                : "Signing In…"
+              : isSignUpMode
+                ? "Create Account"
+                : "Sign In"}
           </button>
         </form>
       </div>

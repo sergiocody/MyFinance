@@ -165,14 +165,14 @@ export default function LabelsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this label?")) return;
-
     const label = labels.find((item) => item.id === id);
 
     if (label?.user_id === null) {
-      setPageError("Shared default labels cannot be deleted.");
+      setPageError("Shared default labels cannot be deleted. Edit it instead to create your own copy.");
       return;
     }
+
+    if (!confirm(`Delete the label “${label?.name ?? ""}”?`)) return;
 
     const { error } = await supabase.from("labels").delete().eq("id", id);
 
@@ -209,7 +209,11 @@ export default function LabelsPage() {
         </button>
       </div>
 
-      {pageError && <div className="notice notice-danger">{pageError}</div>}
+      {pageError && (
+        <div role="alert" className="notice notice-danger">
+          {pageError}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         {labels.map((label) => (
@@ -264,20 +268,27 @@ export default function LabelsPage() {
             </div>
           )}
 
-          {formError && <div className="notice notice-danger">{formError}</div>}
+          {formError && (
+            <div role="alert" className="notice notice-danger">
+              {formError}
+            </div>
+          )}
 
           <div>
-            <label className="field-label">Name</label>
+            <label htmlFor="label-name" className="field-label">Name</label>
             <input
+              id="label-name"
+              name="label-name"
               type="text"
               required
+              autoComplete="off"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="field"
             />
           </div>
-          <div>
-            <p className="field-label">Color</p>
+          <div role="group" aria-labelledby="label-color-label">
+            <p id="label-color-label" className="field-label">Color</p>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
@@ -297,7 +308,7 @@ export default function LabelsPage() {
               Cancel
             </button>
             <button type="submit" disabled={saving} className="btn btn-primary">
-              {editing ? "Update" : "Create"}
+              {saving ? "Saving…" : editing ? "Save Label" : "Create Label"}
             </button>
           </div>
         </form>

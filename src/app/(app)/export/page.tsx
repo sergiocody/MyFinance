@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
+import { format } from "date-fns";
 import { Card } from "@/components/Card";
 import { supabase } from "@/lib/supabase";
 import type { Account, Category, Label, Transaction } from "@/lib/database.types";
@@ -67,7 +68,7 @@ function createFeedbackState(): ExportFeedback {
 }
 
 function getTodayDate() {
-  return new Date().toISOString().split("T")[0];
+  return format(new Date(), "yyyy-MM-dd");
 }
 
 function sanitizeCell(value: unknown): CsvCell {
@@ -151,6 +152,7 @@ export default function ExportPage() {
   const [counts, setCounts] = useState<ExportCounts>(createCountsState);
   const [exporting, setExporting] = useState<ExportFlags>(createFlagsState);
   const [feedback, setFeedback] = useState<ExportFeedback>(createFeedbackState);
+  const [announcement, setAnnouncement] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState("");
   const [today, setToday] = useState("");
@@ -227,6 +229,7 @@ export default function ExportPage() {
   }
 
   function updateFeedback(key: ExportKey, tone: FeedbackTone, text: string) {
+    setAnnouncement(text);
     setFeedback((current) => ({
       ...current,
       [key]: { tone, text },
@@ -245,7 +248,7 @@ export default function ExportPage() {
     }
 
     updateExportState("transactions", true);
-    updateFeedback("transactions", "neutral", "Preparing CSV export...");
+    updateFeedback("transactions", "neutral", "Preparing CSV export…");
 
     try {
       const transactions = await fetchPaginated<TransactionExportRecord>(async (from, to) => {
@@ -340,7 +343,7 @@ export default function ExportPage() {
 
   async function handleExportAccounts() {
     updateExportState("accounts", true);
-    updateFeedback("accounts", "neutral", "Preparing CSV export...");
+    updateFeedback("accounts", "neutral", "Preparing CSV export…");
 
     try {
       const accounts = await fetchPaginated<Account>(async (from, to) => {
@@ -387,7 +390,7 @@ export default function ExportPage() {
 
   async function handleExportCategories() {
     updateExportState("categories", true);
-    updateFeedback("categories", "neutral", "Preparing CSV export...");
+    updateFeedback("categories", "neutral", "Preparing CSV export…");
 
     try {
       const categories = await fetchPaginated<Category>(async (from, to) => {
@@ -422,7 +425,7 @@ export default function ExportPage() {
 
   async function handleExportLabels() {
     updateExportState("labels", true);
-    updateFeedback("labels", "neutral", "Preparing CSV export...");
+    updateFeedback("labels", "neutral", "Preparing CSV export…");
 
     try {
       const labels = await fetchPaginated<Label>(async (from, to) => {
@@ -456,6 +459,9 @@ export default function ExportPage() {
 
   return (
     <div className="space-y-6">
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       <section className="surface-card overflow-hidden rounded-md px-4 py-6 sm:px-6 sm:py-8">
         <p className="label-caps">Data Portability</p>
         <div className="mt-2 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -473,25 +479,25 @@ export default function ExportPage() {
             <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
               <p className="label-caps truncate text-2xs sm:text-xs" title="Transactions">Transactions</p>
               <p className="stat-value mt-2 text-[var(--color-primary)]">
-                {summaryLoading ? "..." : counts.transactions}
+                {summaryLoading ? "…" : counts.transactions}
               </p>
             </div>
             <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
               <p className="label-caps truncate text-2xs sm:text-xs">Accounts</p>
               <p className="stat-value mt-2 text-[var(--color-primary)]">
-                {summaryLoading ? "..." : counts.accounts}
+                {summaryLoading ? "…" : counts.accounts}
               </p>
             </div>
             <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
               <p className="label-caps truncate text-2xs sm:text-xs">Categories</p>
               <p className="stat-value mt-2 text-[var(--color-primary)]">
-                {summaryLoading ? "..." : counts.categories}
+                {summaryLoading ? "…" : counts.categories}
               </p>
             </div>
             <div className="min-w-0 rounded-md border border-[var(--color-border)] bg-white/90 p-3 sm:px-4">
               <p className="label-caps truncate text-2xs sm:text-xs">Labels</p>
               <p className="stat-value mt-2 text-[var(--color-primary)]">
-                {summaryLoading ? "..." : counts.labels}
+                {summaryLoading ? "…" : counts.labels}
               </p>
             </div>
           </div>
@@ -499,8 +505,8 @@ export default function ExportPage() {
       </section>
 
       {summaryError && (
-        <div className="notice notice-danger">
-          Could not load export summary: {summaryError}
+        <div role="alert" className="notice notice-danger">
+          Could not load the export summary ({summaryError}). Reload the page to try again.
         </div>
       )}
 
@@ -537,7 +543,7 @@ export default function ExportPage() {
               ) : (
                 <Download className="h-4 w-4" aria-hidden />
               )}
-              Export transactions
+              Export Transactions
             </button>
           </div>
 
@@ -607,11 +613,11 @@ export default function ExportPage() {
                   Accounts
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
-                  Export the full `accounts` table with balances, currencies, and account metadata.
+                  Export the full <code translate="no">accounts</code> table with balances, currencies, and account metadata.
                 </p>
               </div>
               <span className="chip flex-none whitespace-nowrap">
-                {summaryLoading ? "..." : `${counts.accounts} rows`}
+                {summaryLoading ? "…" : `${counts.accounts} rows`}
               </span>
             </div>
 
@@ -626,7 +632,7 @@ export default function ExportPage() {
               ) : (
                 <Download className="h-4 w-4" aria-hidden />
               )}
-              Export accounts
+              Export Accounts
             </button>
 
             {feedback.accounts.text && (
@@ -644,11 +650,11 @@ export default function ExportPage() {
                   Categories
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
-                  Export the full `categories` table ordered by type and name.
+                  Export the full <code translate="no">categories</code> table ordered by type and name.
                 </p>
               </div>
               <span className="chip flex-none whitespace-nowrap">
-                {summaryLoading ? "..." : `${counts.categories} rows`}
+                {summaryLoading ? "…" : `${counts.categories} rows`}
               </span>
             </div>
 
@@ -663,7 +669,7 @@ export default function ExportPage() {
               ) : (
                 <Download className="h-4 w-4" aria-hidden />
               )}
-              Export categories
+              Export Categories
             </button>
 
             {feedback.categories.text && (
@@ -683,11 +689,11 @@ export default function ExportPage() {
                   Labels
                 </h2>
                 <p className="mt-1 text-sm text-[var(--color-secondary)]">
-                  Export the full `labels` table with colors and creation timestamps.
+                  Export the full <code translate="no">labels</code> table with colors and creation timestamps.
                 </p>
               </div>
               <span className="chip flex-none whitespace-nowrap">
-                {summaryLoading ? "..." : `${counts.labels} rows`}
+                {summaryLoading ? "…" : `${counts.labels} rows`}
               </span>
             </div>
 
@@ -702,7 +708,7 @@ export default function ExportPage() {
               ) : (
                 <Download className="h-4 w-4" aria-hidden />
               )}
-              Export labels
+              Export Labels
             </button>
 
             {feedback.labels.text && (

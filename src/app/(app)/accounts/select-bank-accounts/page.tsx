@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
@@ -85,8 +86,13 @@ export default function SelectBankAccountsPage() {
 
   if (bankAccounts.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-sm text-[var(--color-secondary)]">No bank accounts found.</p>
+      <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
+        <p className="text-sm text-[var(--color-secondary)]">
+          No bank accounts found. Start the bank connection again from Accounts.
+        </p>
+        <Link href="/accounts" className="btn btn-secondary">
+          Back to Accounts
+        </Link>
       </div>
     );
   }
@@ -95,7 +101,7 @@ export default function SelectBankAccountsPage() {
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <p className="label-caps">Linking</p>
-        <h1 className="page-title mt-1">
+        <h1 id="select-bank-accounts-title" className="page-title mt-1">
           Select Bank Accounts
         </h1>
         <p className="mt-1 text-sm text-[var(--color-secondary)]">
@@ -104,7 +110,7 @@ export default function SelectBankAccountsPage() {
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div role="group" aria-labelledby="select-bank-accounts-title" className="space-y-3">
         {bankAccounts.map((account) => {
           const isSelected = selected.has(account.uid);
           return (
@@ -148,18 +154,15 @@ export default function SelectBankAccountsPage() {
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <button
-          onClick={() => router.push("/accounts")}
-          className="btn btn-secondary flex-1"
-        >
+        <Link href="/accounts" className="btn btn-secondary flex-1">
           Cancel
-        </button>
+        </Link>
         <button
           onClick={handleConfirm}
           disabled={selected.size === 0 || loading}
           className="btn btn-primary flex-1"
         >
-          {loading ? "Linking..." : `Link ${selected.size} Account${selected.size !== 1 ? "s" : ""}`}
+          {loading ? "Linking…" : `Link ${selected.size} Account${selected.size !== 1 ? "s" : ""}`}
         </button>
       </div>
     </div>

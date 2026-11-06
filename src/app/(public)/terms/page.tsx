@@ -48,7 +48,7 @@ export default function TermsPage() {
         </p>
         <ul>
           <li>
-            Bank connections are authorised through your bank's own OAuth flow. MyFinance
+            Bank connections are authorised through your bank’s own OAuth flow. MyFinance
             never stores your banking credentials.
           </li>
           <li>
@@ -63,7 +63,7 @@ export default function TermsPage() {
 
       <Section title="5. Disclaimer of Warranties">
         <p>
-          MyFinance is provided "as is" for personal use. No warranty is made regarding
+          MyFinance is provided “as is” for personal use. No warranty is made regarding
           accuracy, availability, or fitness for any particular purpose. Financial data
           displayed is sourced from connected banks and manually entered records — always
           verify important figures directly with your financial institution.
@@ -81,7 +81,7 @@ export default function TermsPage() {
       <Section title="7. Changes to These Terms">
         <p>
           These terms may be updated at any time to reflect changes in the application or
-          applicable regulations. The "Last updated" date at the top of this page indicates
+          applicable regulations. The “Last updated” date at the top of this page indicates
           the most recent revision.
         </p>
       </Section>

@@ -335,7 +335,7 @@ export default function Dashboard() {
           <p className={`stat-value ${net >= 0 ? "amount-pos" : "amount-neg"}`}>
             {formatCurrency(net)}
           </p>
-          <p className="mt-1 text-xs text-[var(--color-secondary)]">Income - Expenses</p>
+          <p className="mt-1 text-xs text-[var(--color-secondary)]">Income − Expenses</p>
         </Card>
       </div>
 
@@ -370,10 +370,19 @@ export default function Dashboard() {
 
       <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
         <Card>
-          <h3 className="label-caps mb-4">
+          <h2 className="label-caps mb-4">
             Income, Transfers & Expenses (Last 6 Months)
-          </h3>
-          <div className="h-56 min-w-0 sm:h-64">
+          </h2>
+          <div
+            role="img"
+            aria-label={`Bar chart of the last 6 months. ${monthlyData
+              .map(
+                (m) =>
+                  `${m.month}: income ${formatCurrency(m.income)}, transfers ${formatCurrency(m.transfer)}, expenses ${formatCurrency(m.expense)}`
+              )
+              .join("; ")}.`}
+            className="h-56 min-w-0 sm:h-64"
+          >
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -390,9 +399,9 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <h3 className="label-caps mb-4">
+          <h2 className="label-caps mb-4">
             Expenses by Category (This Month)
-          </h3>
+          </h2>
           {categoryData.length > 0 ? (
             <div className="space-y-3">
               {(() => {
@@ -417,7 +426,7 @@ export default function Dashboard() {
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(26,28,30,0.06)]">
                       <div
-                        className="h-full rounded-full transition-all"
+                        className="h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
                         style={{
                           width: `${((cat.value / total) * 100).toFixed(1)}%`,
                           backgroundColor: cat.color,
@@ -443,7 +452,7 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <h3 className="label-caps mb-4">Accounts</h3>
+        <h2 className="label-caps mb-4">Accounts</h2>
         {accounts.length > 0 ? (
           <div className="space-y-2">
             {accounts.map((account) => (
@@ -472,7 +481,13 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="py-8 text-center text-sm text-[var(--color-secondary)]">
-            No accounts yet. Create one in the Accounts page.
+            No accounts yet.{" "}
+            <Link
+              href="/accounts"
+              className="font-medium text-[var(--color-tertiary)] underline underline-offset-4 hover:text-[var(--color-tertiary-hover)]"
+            >
+              Create one in Accounts
+            </Link>
           </div>
         )}
       </Card>

@@ -149,14 +149,14 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this category?")) return;
-
     const category = categories.find((item) => item.id === id);
 
     if (category?.user_id === null) {
-      setPageError("Shared default categories cannot be deleted.");
+      setPageError("Shared default categories cannot be deleted. Edit it instead to create your own copy.");
       return;
     }
+
+    if (!confirm(`Delete the category “${category?.name ?? ""}”?`)) return;
 
     const { error } = await supabase.from("categories").delete().eq("id", id);
 
@@ -201,13 +201,20 @@ export default function CategoriesPage() {
         </button>
       </div>
 
-      {pageError && <div className="notice notice-danger">{pageError}</div>}
+      {pageError && (
+        <div role="alert" className="notice notice-danger">
+          {pageError}
+        </div>
+      )}
 
       {(["income", "expense", "transfer"] as const).map((type) => (
         <section key={type}>
           <h2 className="label-caps mb-3">
             {type} ({grouped[type].length})
           </h2>
+          {grouped[type].length === 0 && (
+            <p className="text-sm text-[var(--color-secondary)]">No {type} categories yet.</p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {grouped[type].map((cat) => (
               <Card key={cat.id} className="py-3 pl-4 pr-2 sm:py-3 sm:pl-4 sm:pr-2">
@@ -258,25 +265,34 @@ export default function CategoriesPage() {
             </div>
           )}
 
-          {formError && <div className="notice notice-danger">{formError}</div>}
+          {formError && (
+            <div role="alert" className="notice notice-danger">
+              {formError}
+            </div>
+          )}
 
           <div>
-            <label className="field-label">
+            <label htmlFor="category-name" className="field-label">
               Name
             </label>
             <input
+              id="category-name"
+              name="category-name"
               type="text"
               required
+              autoComplete="off"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="field"
             />
           </div>
           <div>
-            <label className="field-label">
+            <label htmlFor="category-type" className="field-label">
               Type
             </label>
             <select
+              id="category-type"
+              name="category-type"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as Category["type"] })}
               className="field"
@@ -286,8 +302,8 @@ export default function CategoriesPage() {
               <option value="transfer">Transfer</option>
             </select>
           </div>
-          <div>
-            <p className="field-label">
+          <div role="group" aria-labelledby="category-color-label">
+            <p id="category-color-label" className="field-label">
               Color
             </p>
             <div className="flex flex-wrap gap-2">
@@ -309,7 +325,7 @@ export default function CategoriesPage() {
               Cancel
             </button>
             <button type="submit" disabled={saving} className="btn btn-primary">
-              {editing ? "Update" : "Create"}
+              {saving ? "Saving…" : editing ? "Save Category" : "Create Category"}
             </button>
           </div>
         </form>

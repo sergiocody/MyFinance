@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
@@ -245,6 +246,7 @@ export default function ImportPage() {
   const [dragOver, setDragOver] = useState(false);
   const [balanceOverride, setBalanceOverride] = useState<string>("");
   const [editingBalance, setEditingBalance] = useState(false);
+  const doneHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const parserLabel = parserOptions[parserProvider].label;
 
@@ -259,12 +261,29 @@ export default function ImportPage() {
   }, [currentAccountId, currentAccountBalance]);
 
   const baseBalance = parseFloat(balanceOverride) || 0;
+  const selectedCount = transactions.filter((t) => t.selected).length;
   const projectedBalance = currentAccount
     ? baseBalance +
       transactions
         .filter((t) => t.selected)
         .reduce((sum, t) => sum + getSelectedAccountDelta(t), 0)
     : null;
+
+  useEffect(() => {
+    if (step === "done") doneHeadingRef.current?.focus();
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== "parsing" && step !== "review" && step !== "importing") return;
+
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [step]);
 
   useEffect(() => {
     async function load() {
@@ -764,7 +783,7 @@ export default function ImportPage() {
                 Drop your CSV file here
               </p>
               <p className="mb-4 text-xs text-[var(--color-secondary)]">
-                or click to browse. Supports CSV exports from most banks.
+                or choose one with the button below. Supports CSV exports from most banks.
               </p>
               <label className="btn btn-primary w-full cursor-pointer sm:w-auto">
                 Browse Files
@@ -781,7 +800,7 @@ export default function ImportPage() {
               <p className="font-medium">How it works</p>
               <ol className="mt-2 list-inside list-decimal space-y-1 text-xs">
                 <li>Select the account to import into</li>
-                <li>Choose Gemini, Ollama Gemma, or Ollama Qwen as the parser</li>
+                <li>Choose Gemini, Ollama Gemma, Ollama Qwen, or No AI as the parser</li>
                 <li>Drop your bank CSV export file</li>
                 <li>The selected parser analyzes and categorizes each transaction</li>
                 <li>Review, adjust categories, and confirm</li>
@@ -796,7 +815,7 @@ export default function ImportPage() {
           <div className="flex flex-col items-center py-12 text-center">
             <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" aria-hidden />
             <p role="status" className="font-medium text-[var(--color-primary)]">
-              Analyzing your file with {parserLabel}...
+              Analyzing your file with {parserLabel}…
             </p>
             <p className="mt-1 text-sm text-[var(--color-secondary)] wrap-anywhere">
               Parsing {fileName} and categorizing transactions with {parserLabel}
@@ -814,12 +833,11 @@ export default function ImportPage() {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-[var(--color-primary)]">{fileName}</p>
                   <p className="text-xs text-[var(--color-secondary)]">
-                    {transactions.length} transactions found ·{" "}
-                    {transactions.filter((t) => t.selected).length} selected
+                    {transactions.length} transactions found · {selectedCount} selected
                   </p>
                   {currentAccount && (
                     <p className="mt-1 text-xs font-medium text-[var(--color-tertiary)]">
-                      → Importing into: {currentAccount.name}
+                      <span aria-hidden>→ </span>Importing into: {currentAccount.name}
                       {currentAccount.bank_name ? ` (${currentAccount.bank_name})` : ""}
                     </p>
                   )}
@@ -831,36 +849,43 @@ export default function ImportPage() {
                 </button>
                 <button
                   onClick={handleImport}
-                  disabled={transactions.filter((t) => t.selected).length === 0}
+                  disabled={selectedCount === 0}
                   className="btn btn-primary"
                 >
-                  Import {transactions.filter((t) => t.selected).length} Transactions
+                  Import {selectedCount} Transaction{selectedCount === 1 ? "" : "s"}
                 </button>
               </div>
             </div>
             {projectedBalance !== null && currentAccount && (
               <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
                 <span className="flex flex-wrap items-center gap-2 text-[var(--color-secondary)]">
-                  Saldo actual:
+                  Current balance:
                   {editingBalance ? (
                     <input
                       type="number"
                       step="0.01"
+                      inputMode="decimal"
+                      autoComplete="off"
                       value={balanceOverride}
                       onChange={(e) => setBalanceOverride(e.target.value)}
                       onBlur={() => setEditingBalance(false)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") setEditingBalance(false);
+                        if (e.key === "Enter" || e.key === "Escape") {
+                          e.preventDefault();
+                          setEditingBalance(false);
+                        }
                       }}
+                      // Focus follows the explicit "edit balance" click.
                       autoFocus
-                      aria-label="Saldo actual"
-                      className="field field-sm w-32 font-medium"
+                      aria-label="Current balance"
+                      className="field field-sm w-32 font-medium tabular-nums"
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setEditingBalance(true)}
-                      title="Haz clic para corregir el saldo actual"
+                      aria-label={`${formatCurrency(baseBalance)} — edit current balance`}
+                      title="Click to correct the current balance"
                       className="pressable hit-area rounded-sm font-medium tabular-nums text-[var(--color-primary)] underline decoration-dashed underline-offset-4 hover:text-[var(--color-tertiary)]"
                     >
                       {formatCurrency(baseBalance)}
@@ -868,11 +893,11 @@ export default function ImportPage() {
                   )}
                   <span className="text-xs text-[var(--color-secondary)]">(editable)</span>
                 </span>
-                <span className="text-[var(--color-secondary)]">→</span>
+                <span className="text-[var(--color-secondary)]" aria-hidden>→</span>
                 <span className="text-[var(--color-secondary)]">
-                  Saldo proyectado:{" "}
+                  Projected balance:{" "}
                   <span
-                    className={`font-semibold ${projectedBalance >= 0 ? "amount-pos" : "amount-neg"}`}
+                    className={`font-semibold tabular-nums ${projectedBalance >= 0 ? "amount-pos" : "amount-neg"}`}
                   >
                     {formatCurrency(projectedBalance)}
                   </span>
@@ -906,17 +931,19 @@ export default function ImportPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)] text-left">
-                  <th className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all transactions"
-                      checked={
-                        transactions.filter((t) => !t.validationError).length > 0 &&
-                        transactions.filter((t) => !t.validationError).every((t) => t.selected)
-                      }
-                      onChange={toggleAll}
-                      className="h-4 w-4 rounded-sm accent-[var(--color-tertiary)]"
-                    />
+                  <th className="px-2 py-1">
+                    <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all transactions"
+                        checked={
+                          transactions.filter((t) => !t.validationError).length > 0 &&
+                          transactions.filter((t) => !t.validationError).every((t) => t.selected)
+                        }
+                        onChange={toggleAll}
+                        className="h-4 w-4 cursor-pointer rounded-sm accent-[var(--color-tertiary)]"
+                      />
+                    </label>
                   </th>
                   <th className="label-caps px-4 py-3">Date</th>
                   <th className="label-caps px-4 py-3">Description</th>
@@ -934,23 +961,25 @@ export default function ImportPage() {
                     key={i}
                     className={tx.selected ? "" : "bg-[rgba(26,28,30,0.02)] opacity-60"}
                   >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select transaction ${tx.description || i + 1}`}
-                        checked={tx.selected}
-                        disabled={Boolean(tx.validationError)}
-                        onChange={() => toggleTransaction(i)}
-                        className="h-4 w-4 rounded-sm accent-[var(--color-tertiary)]"
-                      />
+                    <td className="px-2 py-1">
+                      <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center has-[:disabled]:cursor-not-allowed">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select transaction ${tx.description || i + 1}`}
+                          checked={tx.selected}
+                          disabled={Boolean(tx.validationError)}
+                          onChange={() => toggleTransaction(i)}
+                          className="h-4 w-4 cursor-pointer rounded-sm accent-[var(--color-tertiary)] disabled:cursor-not-allowed"
+                        />
+                      </label>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
-                      {tx.date}
+                      {formatDate(tx.date)}
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[var(--color-primary)]">{tx.description}</p>
+                    <td className="min-w-48 max-w-80 px-4 py-3">
+                      <p className="font-medium text-[var(--color-primary)] wrap-anywhere">{tx.description}</p>
                       {tx.notes && (
-                        <p className="text-xs text-[var(--color-secondary)]">{tx.notes}</p>
+                        <p className="text-xs text-[var(--color-secondary)] wrap-anywhere">{tx.notes}</p>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -1030,7 +1059,7 @@ export default function ImportPage() {
                             </option>
                           ))}
                       </select>
-                      {tx.category_id && (
+                      {tx.category_id && parserProvider !== "raw" && (
                         <p className="label-caps mt-1 text-[var(--color-tertiary)]">
                           AI suggestion
                         </p>
@@ -1048,7 +1077,7 @@ export default function ImportPage() {
                         </p>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">
                       <span
                         className={
                           tx.type === "income"
@@ -1082,7 +1111,7 @@ export default function ImportPage() {
         <Card>
           <div className="flex flex-col items-center py-12">
             <Loader2 className="mb-4 h-10 w-10 animate-spin text-[var(--color-tertiary)]" aria-hidden />
-            <p role="status" className="font-medium text-[var(--color-primary)]">Importing transactions...</p>
+            <p role="status" className="font-medium text-[var(--color-primary)]">Importing transactions…</p>
           </div>
         </Card>
       )}
@@ -1091,18 +1120,20 @@ export default function ImportPage() {
         <Card>
           <div className="flex flex-col items-center py-12 text-center">
             <CheckCircle2 className="mb-4 h-12 w-12 text-[var(--color-success)]" aria-hidden />
-            <p className="section-title">Import Complete!</p>
+            <h2 ref={doneHeadingRef} tabIndex={-1} className="section-title focus:outline-none">
+              Import Complete
+            </h2>
             <p className="mt-1 text-sm text-[var(--color-secondary)]">
-              {importResult.imported} transactions imported
+              {importResult.imported} transaction{importResult.imported === 1 ? "" : "s"} imported
               {importResult.skipped > 0 && `, ${importResult.skipped} skipped`}
             </p>
             <div className="mt-6 flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
               <button onClick={reset} className="btn btn-secondary">
                 Import More
               </button>
-              <a href="/transactions" className="btn btn-primary">
+              <Link href="/transactions" className="btn btn-primary">
                 View Transactions
-              </a>
+              </Link>
             </div>
           </div>
         </Card>
@@ -1141,7 +1172,7 @@ function ImportHistory() {
 
   return (
     <Card>
-      <h3 className="label-caps mb-4">Recent Imports</h3>
+      <h2 className="label-caps mb-4">Recent Imports</h2>
       <div className="space-y-2">
         {imports.map((imp) => (
           <div

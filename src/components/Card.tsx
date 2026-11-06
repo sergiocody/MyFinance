@@ -29,8 +29,8 @@ export function CardTitle({
   className?: string;
 }) {
   return (
-    <h3 className={cn("label-caps", className)}>
+    <h2 className={cn("label-caps", className)}>
       {children}
-    </h3>
+    </h2>
   );
 }

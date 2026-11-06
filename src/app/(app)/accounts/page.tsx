@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/Card";
 import Modal from "@/components/Modal";
@@ -157,9 +157,14 @@ function AccountTrendSparkline({
     <div className="space-y-2">
       <div className="label-caps flex items-center justify-between gap-2">
         <span>6M Evolution</span>
-        <span className="truncate">{points[0]?.label} - {points.at(-1)?.label}</span>
+        <span className="truncate">{points[0]?.label}–{points.at(-1)?.label}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full overflow-visible">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`Balance trend ${points[0]?.label}–${points.at(-1)?.label}: ${formatCurrency(points[0]!.balance)} to ${formatCurrency(points.at(-1)!.balance)}`}
+        className="h-14 w-full overflow-visible"
+      >
         <polyline points={areaPoints} fill={color} fillOpacity="0.12" stroke="none" />
         <polyline
           points={polylinePoints}
@@ -182,7 +187,7 @@ function AccountTrendSparkline({
         ))}
       </svg>
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="text-[var(--color-secondary)]">Click to view transactions</span>
+        <span className="text-[var(--color-secondary)]">View transactions</span>
         <span className={`flex-none font-medium tabular-nums ${delta >= 0 ? "amount-pos" : "amount-neg"}`}>
           {delta >= 0 ? "+" : ""}
           {formatCurrency(delta)}
@@ -224,6 +229,7 @@ function BankConnectFlow({
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loadingInstitutions, setLoadingInstitutions] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState("");
   const [search, setSearch] = useState("");
 
   async function loadInstitutions(countryCode: string) {
@@ -254,6 +260,7 @@ function BankConnectFlow({
   async function handleSelectInstitution(institution: Institution) {
     if (!accountId) return;
     setConnecting(true);
+    setConnectError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -276,8 +283,12 @@ function BankConnectFlow({
         window.location.href = url;
       } else {
         const { error } = await res.json();
-        alert(`Connection failed: ${error}`);
+        setConnectError(
+          `Could not connect to ${institution.name}${error ? ` (${error})` : ""}. Try again or pick another bank.`
+        );
       }
+    } catch {
+      setConnectError("Could not reach the bank connection service. Check your connection and try again.");
     } finally {
       setConnecting(false);
     }
@@ -310,14 +321,29 @@ function BankConnectFlow({
 
       <div>
         <input
-          type="text"
-          placeholder="Search banks..."
+          type="search"
+          name="bank-search"
+          placeholder="Search banks…"
           aria-label="Search banks"
+          autoComplete="off"
+          spellCheck={false}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="field"
         />
       </div>
+
+      {connectError && (
+        <div role="alert" className="notice notice-danger">
+          {connectError}
+        </div>
+      )}
+
+      {connecting && (
+        <p role="status" className="text-sm text-[var(--color-secondary)]">
+          Connecting to your bank…
+        </p>
+      )}
 
       {loadingInstitutions ? (
         <div className="flex justify-center py-8">
@@ -328,7 +354,7 @@ function BankConnectFlow({
           />
         </div>
       ) : (
-        <div className="max-h-64 space-y-2 overflow-y-auto">
+        <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain">
           {filtered.map((inst) => (
             <button
               key={inst.id}
@@ -339,7 +365,14 @@ function BankConnectFlow({
             >
               {inst.logo && (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={inst.logo} alt="" className="h-6 w-6 flex-none rounded-sm object-contain" />
+                <img
+                  src={inst.logo}
+                  alt=""
+                  width={24}
+                  height={24}
+                  loading="lazy"
+                  className="h-6 w-6 flex-none rounded-sm object-contain"
+                />
               )}
               <span className="min-w-0 truncate font-medium text-[var(--color-primary)]">{inst.name}</span>
             </button>
@@ -360,7 +393,6 @@ function BankConnectFlow({
 }
 
 export default function AccountsPage() {
-  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [bankConnections, setBankConnections] = useState<Record<string, BankConnection>>({});
   const [accountTrends, setAccountTrends] = useState<Record<string, AccountTrendPoint[]>>({});
@@ -371,9 +403,14 @@ export default function AccountsPage() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ account: Account; txCount: number } | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<string>("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState<Account | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     name: "",
     type: "checking" as Account["type"],
@@ -442,6 +479,7 @@ export default function AccountsPage() {
 
   function openCreate() {
     setEditing(null);
+    setFormError("");
     setForm({
       name: "",
       type: "checking",
@@ -459,6 +497,7 @@ export default function AccountsPage() {
 
   function openEdit(account: Account) {
     setEditing(account);
+    setFormError("");
     setForm({
       name: account.name,
       type: account.type,
@@ -476,37 +515,46 @@ export default function AccountsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
+    setFormError("");
+    setSaving(true);
     const balance = parseFloat(form.initial_balance) || 0;
 
-    if (editing) {
-      await supabase
-        .from("accounts")
-        .update({
+    const { error } = editing
+      ? await supabase
+          .from("accounts")
+          .update({
+            name: form.name,
+            type: form.type,
+            bank_name: form.bank_name || null,
+            iban: form.iban.trim() || null,
+            color: form.color,
+            currency: form.currency,
+            account_class: form.account_class,
+            parent_account_id: form.parent_account_id || null,
+          })
+          .eq("id", editing.id)
+      : await supabase.from("accounts").insert({
           name: form.name,
           type: form.type,
           bank_name: form.bank_name || null,
           iban: form.iban.trim() || null,
+          initial_balance: form.account_mode === "manual" ? balance : 0,
+          current_balance: form.account_mode === "manual" ? balance : 0,
           color: form.color,
           currency: form.currency,
+          account_mode: form.account_mode,
           account_class: form.account_class,
           parent_account_id: form.parent_account_id || null,
-        })
-        .eq("id", editing.id);
-    } else {
-      await supabase.from("accounts").insert({
-        name: form.name,
-        type: form.type,
-        bank_name: form.bank_name || null,
-        iban: form.iban.trim() || null,
-        initial_balance: form.account_mode === "manual" ? balance : 0,
-        current_balance: form.account_mode === "manual" ? balance : 0,
-        color: form.color,
-        currency: form.currency,
-        account_mode: form.account_mode,
-        account_class: form.account_class,
-        parent_account_id: form.parent_account_id || null,
-      });
+        });
+
+    setSaving(false);
+
+    if (error) {
+      setFormError(`The account could not be saved (${error.message}). Check the details and try again.`);
+      return;
     }
+
     setModalOpen(false);
     loadAccounts();
   }
@@ -523,6 +571,7 @@ export default function AccountsPage() {
     if (count && count > 0) {
       setDeleteModal({ account, txCount: count });
       setMigrateTarget("");
+      setDeleteError("");
     } else {
       if (!confirm("Delete this empty account?")) return;
       await supabase.from("bank_connections").delete().eq("account_id", id);
@@ -537,23 +586,44 @@ export default function AccountsPage() {
     }
   }
 
+  async function runDeleteSteps(
+    steps: (() => PromiseLike<{ error: { message: string } | null }>)[]
+  ) {
+    setDeleting(true);
+    setDeleteError("");
+
+    for (const step of steps) {
+      const { error } = await step();
+      if (error) {
+        setDeleting(false);
+        setDeleteError(
+          `The account could not be deleted (${error.message}). Some changes may already be applied — review the account and try again.`
+        );
+        loadAccounts();
+        return false;
+      }
+    }
+
+    setDeleting(false);
+    return true;
+  }
+
   async function confirmDeleteWithMigration() {
-    if (!deleteModal || !migrateTarget) return;
+    if (!deleteModal || !migrateTarget || deleting) return;
     const sourceId = deleteModal.account.id;
 
-    await supabase
-      .from("transactions")
-      .update({ account_id: migrateTarget })
-      .eq("account_id", sourceId);
-
-    await supabase
-      .from("transactions")
-      .update({ transfer_to_account_id: migrateTarget })
-      .eq("transfer_to_account_id", sourceId);
-
-    await supabase.from("bank_connections").delete().eq("account_id", sourceId);
-    await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
-    await supabase.from("accounts").delete().eq("id", sourceId);
+    const ok = await runDeleteSteps([
+      () => supabase.from("transactions").update({ account_id: migrateTarget }).eq("account_id", sourceId),
+      () =>
+        supabase
+          .from("transactions")
+          .update({ transfer_to_account_id: migrateTarget })
+          .eq("transfer_to_account_id", sourceId),
+      () => supabase.from("bank_connections").delete().eq("account_id", sourceId),
+      () => supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId),
+      () => supabase.from("accounts").delete().eq("id", sourceId),
+    ]);
+    if (!ok) return;
 
     setDeleteModal(null);
     showToast("success", `Account deleted. ${deleteModal.txCount} transactions moved.`);
@@ -561,46 +631,41 @@ export default function AccountsPage() {
   }
 
   async function confirmDeleteAll() {
-    if (!deleteModal) return;
+    if (!deleteModal || deleting) return;
     const sourceId = deleteModal.account.id;
 
-    await supabase
-      .from("transactions")
-      .update({ transfer_to_account_id: null })
-      .eq("transfer_to_account_id", sourceId);
-
-    await supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId);
-
-    const { error } = await supabase.from("accounts").delete().eq("id", sourceId);
+    const ok = await runDeleteSteps([
+      () =>
+        supabase
+          .from("transactions")
+          .update({ transfer_to_account_id: null })
+          .eq("transfer_to_account_id", sourceId),
+      () => supabase.from("imports").update({ account_id: null }).eq("account_id", sourceId),
+      () => supabase.from("accounts").delete().eq("id", sourceId),
+    ]);
+    if (!ok) return;
 
     setDeleteModal(null);
-    if (error) {
-      showToast("error", `Failed to delete: ${error.message}`);
-    } else {
-      showToast("success", `Account and ${deleteModal.txCount} transactions deleted.`);
-    }
+    showToast("success", `Account and ${deleteModal.txCount} transactions deleted.`);
     loadAccounts();
   }
 
   async function toggleActive(account: Account) {
-    await supabase
+    const { error } = await supabase
       .from("accounts")
       .update({ is_active: !account.is_active })
       .eq("id", account.id);
+    if (error) {
+      showToast("error", `Could not update ${account.name} (${error.message}). Try again.`);
+      return;
+    }
     loadAccounts();
   }
 
-  function openTransactionsForAccount(accountId: string) {
-    router.push(`/transactions?account=${accountId}`);
-  }
-
-  function stopCardNavigation(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-  }
-
   function showToast(type: "success" | "error", message: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ type, message });
-    setTimeout(() => setToast(null), 6000);
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
   }
 
   async function handleSync(accountId: string) {
@@ -665,7 +730,10 @@ export default function AccountsPage() {
     setSyncing(null);
     setSyncingAll(false);
     loadAccounts();
-    showToast("success", `Sync complete: ${success} OK${failed ? `, ${failed} failed` : ""}`);
+    showToast(
+      failed ? "error" : "success",
+      `Sync complete: ${success} OK${failed ? `, ${failed} failed — open the failed account and use Sync or Reconnect` : ""}`
+    );
   }
 
   async function handleConnectBank(accountId: string) {
@@ -687,29 +755,34 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div
-          role="status"
-          className={`fixed inset-x-4 top-20 z-50 mx-auto flex max-w-md items-center gap-2 py-2 pl-4 pr-2 lg:top-4 ${
-            toast.type === "success" ? "notice notice-success" : "notice notice-danger"
-          }`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 size={18} className="flex-none" aria-hidden />
-          ) : (
-            <XCircle size={18} className="flex-none" aria-hidden />
-          )}
-          <span className="min-w-0 flex-1 text-sm font-medium">{toast.message}</span>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="btn btn-ghost btn-icon flex-none text-current hover:text-current"
-            aria-label="Dismiss notification"
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-4 top-20 z-50 mx-auto max-w-md lg:top-4"
+      >
+        {toast && (
+          <div
+            className={`pointer-events-auto flex items-center gap-2 py-2 pl-4 pr-2 ${
+              toast.type === "success" ? "notice notice-success" : "notice notice-danger"
+            }`}
           >
-            <X size={16} aria-hidden />
-          </button>
-        </div>
-      )}
+            {toast.type === "success" ? (
+              <CheckCircle2 size={18} className="flex-none" aria-hidden />
+            ) : (
+              <XCircle size={18} className="flex-none" aria-hidden />
+            )}
+            <span className="min-w-0 flex-1 text-sm font-medium">{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="btn btn-ghost btn-icon flex-none text-current hover:text-current"
+              aria-label="Dismiss notification"
+            >
+              <X size={16} aria-hidden />
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -726,7 +799,7 @@ export default function AccountsPage() {
               className="btn btn-secondary"
             >
               <RefreshCw size={16} className={syncingAll ? "animate-spin" : ""} aria-hidden />
-              Sync All
+              {syncingAll ? "Syncing…" : "Sync All"}
             </button>
           )}
           <button onClick={openCreate} className="btn btn-primary">
@@ -740,16 +813,7 @@ export default function AccountsPage() {
         {accounts.map((account) => (
           <Card
             key={account.id}
-            role="link"
-            tabIndex={0}
-            onClick={() => openTransactionsForAccount(account.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openTransactionsForAccount(account.id);
-              }
-            }}
-            className={`cursor-pointer transition duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 ${
+            className={`relative transition duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--color-tertiary)] ${
               !account.is_active ? "opacity-50" : ""
             } ${
               account.account_mode === "automated"
@@ -764,7 +828,15 @@ export default function AccountsPage() {
                   style={{ backgroundColor: account.color }}
                 />
                 <div className="min-w-0">
-                  <h3 className="truncate font-semibold text-[var(--color-primary)]">{account.name}</h3>
+                  <h2 className="truncate font-semibold text-[var(--color-primary)]">
+                    {/* The ::after overlay makes the whole card clickable while keeping real link semantics. */}
+                    <Link
+                      href={`/transactions?account=${account.id}`}
+                      className="after:absolute after:inset-0 after:rounded-md focus-visible:outline-none"
+                    >
+                      {account.name}
+                    </Link>
+                  </h2>
                   <p className="truncate text-xs text-[var(--color-secondary)]">
                     {account.bank_name && `${account.bank_name} · `}
                     {ACCOUNT_TYPES.find((t) => t.value === account.type)?.label}
@@ -779,24 +851,18 @@ export default function AccountsPage() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-none gap-1">
+              <div className="relative z-10 flex flex-none gap-1">
                 <button
-                  onClick={(event) => {
-                    stopCardNavigation(event);
-                    openEdit(account);
-                  }}
-                  onKeyDown={(event) => event.stopPropagation()}
+                  type="button"
+                  onClick={() => openEdit(account)}
                   aria-label={`Edit account ${account.name}`}
                   className="btn btn-ghost btn-icon"
                 >
                   <Pencil size={16} aria-hidden />
                 </button>
                 <button
-                  onClick={(event) => {
-                    stopCardNavigation(event);
-                    handleDelete(account.id);
-                  }}
-                  onKeyDown={(event) => event.stopPropagation()}
+                  type="button"
+                  onClick={() => handleDelete(account.id)}
                   aria-label={`Delete account ${account.name}`}
                   className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                 >
@@ -864,20 +930,17 @@ export default function AccountsPage() {
                       </span>
                     )}
                     <button
-                      onClick={(event) => {
-                        stopCardNavigation(event);
-                        handleSync(account.id);
-                      }}
-                      onKeyDown={(event) => event.stopPropagation()}
+                      type="button"
+                      onClick={() => handleSync(account.id)}
                       disabled={syncing === account.id}
-                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
+                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
                     >
                       <RefreshCw
                         size={14}
                         aria-hidden
                         className={syncing === account.id ? "animate-spin" : ""}
                       />
-                      Sync
+                      {syncing === account.id ? "Syncing…" : "Sync"}
                     </button>
                   </>
                 ) : bankConnections[account.id]?.status === "expired" ||
@@ -888,12 +951,9 @@ export default function AccountsPage() {
                       {bankConnections[account.id]?.status === "expired" ? "Expired" : "Error"}
                     </span>
                     <button
-                      onClick={(event) => {
-                        stopCardNavigation(event);
-                        handleConnectBank(account.id);
-                      }}
-                      onKeyDown={(event) => event.stopPropagation()}
-                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-warning)]"
+                      type="button"
+                      onClick={() => handleConnectBank(account.id)}
+                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-warning)]"
                     >
                       <Link2 size={14} aria-hidden />
                       Reconnect
@@ -904,12 +964,9 @@ export default function AccountsPage() {
                     <WifiOff size={12} className="text-[var(--color-secondary)]" aria-hidden />
                     <span className="text-xs text-[var(--color-secondary)]">Not connected</span>
                     <button
-                      onClick={(event) => {
-                        stopCardNavigation(event);
-                        handleConnectBank(account.id);
-                      }}
-                      onKeyDown={(event) => event.stopPropagation()}
-                      className="btn btn-ghost btn-sm -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
+                      type="button"
+                      onClick={() => handleConnectBank(account.id)}
+                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
                     >
                       <Link2 size={14} aria-hidden />
                       Connect Bank
@@ -928,12 +985,10 @@ export default function AccountsPage() {
 
             <div className="mt-3 flex items-center justify-end">
               <button
-                onClick={(event) => {
-                  stopCardNavigation(event);
-                  toggleActive(account);
-                }}
-                onKeyDown={(event) => event.stopPropagation()}
-                className={`chip pressable hit-area ${account.is_active ? "chip-success" : ""}`}
+                type="button"
+                onClick={() => toggleActive(account)}
+                aria-label={`${account.is_active ? "Active" : "Inactive"} — mark ${account.name} as ${account.is_active ? "inactive" : "active"}`}
+                className={`chip pressable hit-area z-10 ${account.is_active ? "chip-success" : ""}`}
               >
                 {account.is_active ? "Active" : "Inactive"}
               </button>
@@ -945,7 +1000,11 @@ export default function AccountsPage() {
       {accounts.length === 0 && (
         <Card>
           <div className="py-12 text-center">
-            <p className="text-sm text-[var(--color-secondary)]">No accounts yet. Create your first one!</p>
+            <p className="text-sm text-[var(--color-secondary)]">No accounts yet.</p>
+            <button type="button" onClick={openCreate} className="btn btn-primary mt-4">
+              <Plus size={16} aria-hidden />
+              Add Your First Account
+            </button>
           </div>
         </Card>
       )}
@@ -959,8 +1018,8 @@ export default function AccountsPage() {
       >
         <form onSubmit={handleSave} className="space-y-4">
           {!editing && (
-            <div>
-              <p className="field-label">
+            <div role="group" aria-labelledby="account-mode-label">
+              <p id="account-mode-label" className="field-label">
                 Account Mode
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -999,25 +1058,30 @@ export default function AccountsPage() {
           )}
 
           <div>
-            <label className="field-label">
+            <label htmlFor="account-name" className="field-label">
               Name
             </label>
             <input
+              id="account-name"
+              name="account-name"
               type="text"
               required
+              autoComplete="off"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="field"
-              placeholder="e.g., Main Checking"
+              placeholder="e.g., Main Checking…"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="field-label">
+              <label htmlFor="account-type" className="field-label">
                 Type
               </label>
               <select
+                id="account-type"
+                name="account-type"
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value as Account["type"] })}
                 className="field"
@@ -1028,11 +1092,16 @@ export default function AccountsPage() {
               </select>
             </div>
             <div>
-              <label className="field-label">
+              <label htmlFor="account-currency" className="field-label">
                 Currency
               </label>
               <input
+                id="account-currency"
+                name="account-currency"
                 type="text"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
                 value={form.currency}
                 onChange={(e) => setForm({ ...form, currency: e.target.value })}
                 className="field"
@@ -1041,51 +1110,65 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="field-label">
+            <label htmlFor="account-bank-name" className="field-label">
               Bank Name
             </label>
             <input
+              id="account-bank-name"
+              name="account-bank-name"
               type="text"
+              autoComplete="off"
               value={form.bank_name}
               onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
               className="field"
-              placeholder="e.g., ING, BBVA"
+              placeholder="e.g., ING, BBVA…"
             />
           </div>
 
           <div>
-            <label className="field-label">
-              IBAN / Account number
+            <label htmlFor="account-iban" className="field-label">
+              IBAN / Account Number
             </label>
             <input
+              id="account-iban"
+              name="account-iban"
               type="text"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              translate="no"
+              aria-describedby="account-iban-hint"
               value={form.iban}
               onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })}
               className="field"
-              placeholder="e.g., ES8001287820840104072774"
+              placeholder="e.g., ES8001287820840104072774…"
             />
-            <p className="mt-2 text-xs text-[var(--color-secondary)]">
+            <p id="account-iban-hint" className="mt-2 text-xs text-[var(--color-secondary)]">
               Used to detect transfers automatically during CSV imports and bank sync.
             </p>
           </div>
 
           {!editing && form.account_mode === "manual" && (
             <div>
-              <label className="field-label">
-                Initial Balance (€)
+              <label htmlFor="account-initial-balance" className="field-label">
+                Initial Balance ({form.currency || "EUR"})
               </label>
               <input
+                id="account-initial-balance"
+                name="account-initial-balance"
                 type="number"
                 step="0.01"
+                inputMode="decimal"
+                autoComplete="off"
                 value={form.initial_balance}
                 onChange={(e) => setForm({ ...form, initial_balance: e.target.value })}
-                className="field"
+                className="field tabular-nums"
               />
             </div>
           )}
 
-          <div>
-            <p className="field-label">
+          <div role="group" aria-labelledby="account-color-label">
+            <p id="account-color-label" className="field-label">
               Color
             </p>
             <div className="flex flex-wrap gap-2">
@@ -1104,10 +1187,12 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="field-label">
-              Account class
+            <label htmlFor="account-class" className="field-label">
+              Account Class
             </label>
             <select
+              id="account-class"
+              name="account-class"
               value={form.account_class}
               onChange={(e) =>
                 setForm({
@@ -1124,10 +1209,13 @@ export default function AccountsPage() {
           </div>
 
           <div>
-            <label className="field-label">
-              Sub-account of
+            <label htmlFor="account-parent" className="field-label">
+              Sub-account Of
             </label>
             <select
+              id="account-parent"
+              name="account-parent"
+              aria-describedby="account-parent-hint"
               value={form.parent_account_id}
               onChange={(e) => setForm({ ...form, parent_account_id: e.target.value })}
               className="field"
@@ -1141,18 +1229,24 @@ export default function AccountsPage() {
                   </option>
                 ))}
             </select>
-            <p className="mt-2 text-xs text-[var(--color-secondary)]">
+            <p id="account-parent-hint" className="mt-2 text-xs text-[var(--color-secondary)]">
               If set, this account&apos;s balance will be subtracted from the parent&apos;s
               displayed balance.
             </p>
           </div>
 
+          {formError && (
+            <div role="alert" className="notice notice-danger">
+              {formError}
+            </div>
+          )}
+
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
-              {editing ? "Update" : "Create"}
+            <button type="submit" disabled={saving} className="btn btn-primary">
+              {saving ? "Saving…" : editing ? "Save Account" : "Create Account"}
             </button>
           </div>
         </form>
@@ -1161,7 +1255,9 @@ export default function AccountsPage() {
       {/* Delete Account Modal */}
       <Modal
         open={!!deleteModal}
-        onClose={() => setDeleteModal(null)}
+        onClose={() => {
+          if (!deleting) setDeleteModal(null);
+        }}
         title="Delete Account"
         mobileSheet
       >
@@ -1180,7 +1276,7 @@ export default function AccountsPage() {
               aria-label="Account to migrate transactions to"
               className="field"
             >
-              <option value="">Select account to migrate...</option>
+              <option value="">Select account to migrate…</option>
               {accounts
                 .filter((a) => a.id !== deleteModal.account.id)
                 .map((a) => (
@@ -1189,10 +1285,16 @@ export default function AccountsPage() {
                   </option>
                 ))}
             </select>
+            {deleteError && (
+              <div role="alert" className="notice notice-danger">
+                {deleteError}
+              </div>
+            )}
             <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setDeleteModal(null)}
+                disabled={deleting}
                 className="btn btn-secondary"
               >
                 Cancel
@@ -1200,17 +1302,18 @@ export default function AccountsPage() {
               <button
                 type="button"
                 onClick={confirmDeleteAll}
+                disabled={deleting}
                 className="btn btn-danger-outline"
               >
-                Delete All
+                {deleting ? "Deleting…" : "Delete All"}
               </button>
               <button
                 type="button"
-                disabled={!migrateTarget}
+                disabled={!migrateTarget || deleting}
                 onClick={confirmDeleteWithMigration}
                 className="btn btn-danger"
               >
-                Move &amp; Delete
+                {deleting ? "Deleting…" : "Move & Delete"}
               </button>
             </div>
           </div>

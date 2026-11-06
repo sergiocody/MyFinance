@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { LabelMultiSelect } from "@/components/LabelMultiSelect";
@@ -44,6 +44,7 @@ export function SplitModal({
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow()]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const fieldId = useId();
 
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.type === transaction?.type),
@@ -77,7 +78,7 @@ export function SplitModal({
   }
 
   async function handleSave() {
-    if (!transaction) return;
+    if (!transaction || saving) return;
     setError("");
 
     if (rows.length < 2) {
@@ -89,7 +90,8 @@ export function SplitModal({
     for (const [i, row] of rows.entries()) {
       const value = parseFloat(row.amount);
       if (!Number.isFinite(value) || value <= 0) {
-        setError(`Row ${i + 1}: amount must be greater than zero.`);
+        setError(`Split ${i + 1}: enter an amount greater than zero.`);
+        document.getElementById(`${fieldId}-amount-${i}`)?.focus();
         return;
       }
       cleaned.push({
@@ -102,7 +104,7 @@ export function SplitModal({
 
     if (!balanced) {
       setError(
-        `Splits sum to ${formatCurrency(assigned)} but the transaction is ${formatCurrency(total)}.`
+        `Splits sum to ${formatCurrency(assigned)} but the transaction is ${formatCurrency(total)}. Adjust the amounts or use “Fill Rest”.`
       );
       return;
     }
@@ -142,7 +144,7 @@ export function SplitModal({
   if (!transaction) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title="Split transaction" size="lg" mobileSheet bodyClassName="p-0">
+    <Modal open={open} onClose={onClose} title="Split Transaction" size="lg" mobileSheet bodyClassName="p-0">
       <div className="flex h-full flex-col bg-[var(--color-neutral)]">
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-6">
           <section className="surface-card rounded-md p-4 sm:p-5">
@@ -191,13 +193,13 @@ export function SplitModal({
                       className="btn btn-ghost btn-sm"
                       title="Assign remaining amount here"
                     >
-                      Fill rest
+                      Fill Rest
                     </button>
                     {rows.length > 2 && (
                       <button
                         type="button"
                         onClick={() => removeRow(index)}
-                        aria-label="Remove split"
+                        aria-label={`Remove split ${index + 1}`}
                         className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
                       >
                         <Trash2 size={16} aria-hidden />
@@ -208,10 +210,11 @@ export function SplitModal({
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
-                    <label className="field-label">
+                    <label htmlFor={`${fieldId}-category-${index}`} className="field-label">
                       Category
                     </label>
                     <select
+                      id={`${fieldId}-category-${index}`}
                       value={row.category_id}
                       onChange={(e) => updateRow(index, { category_id: e.target.value })}
                       className="field"
@@ -226,21 +229,26 @@ export function SplitModal({
                   </div>
 
                   <div>
-                    <label className="field-label">
+                    <label htmlFor={`${fieldId}-amount-${index}`} className="field-label">
                       Amount
                     </label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--color-secondary)]">
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--color-secondary)]"
+                      >
                         €
                       </span>
                       <input
+                        id={`${fieldId}-amount-${index}`}
                         type="number"
                         step="0.01"
                         min="0.01"
                         inputMode="decimal"
+                        autoComplete="off"
                         value={row.amount}
                         onChange={(e) => updateRow(index, { amount: e.target.value })}
-                        className="field pl-7 text-right font-semibold"
+                        className="field pl-7 text-right font-semibold tabular-nums"
                         placeholder="0.00"
                       />
                     </div>
@@ -248,11 +256,13 @@ export function SplitModal({
                 </div>
 
                 <div>
-                  <label className="field-label">
+                  <label htmlFor={`${fieldId}-description-${index}`} className="field-label">
                     Description (optional)
                   </label>
                   <input
+                    id={`${fieldId}-description-${index}`}
                     type="text"
+                    autoComplete="off"
                     value={row.description}
                     onChange={(e) => updateRow(index, { description: e.target.value })}
                     className="field"
@@ -261,13 +271,14 @@ export function SplitModal({
                 </div>
 
                 <div>
-                  <label className="field-label">
+                  <p id={`${fieldId}-labels-${index}`} className="field-label">
                     Labels
-                  </label>
+                  </p>
                   <LabelMultiSelect
                     labels={labels}
                     selectedIds={row.label_ids}
                     onChange={(ids) => updateRow(index, { label_ids: ids })}
+                    labelledBy={`${fieldId}-labels-${index}`}
                   />
                 </div>
               </div>
@@ -279,11 +290,15 @@ export function SplitModal({
               className="btn btn-secondary w-full"
             >
               <Plus size={16} aria-hidden />
-              Add another split
+              Add Another Split
             </button>
           </section>
 
-          {error && <div className="notice notice-danger">{error}</div>}
+          {error && (
+            <div role="alert" className="notice notice-danger">
+              {error}
+            </div>
+          )}
         </div>
 
         <div className="border-t border-[var(--color-border)] bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
@@ -295,7 +310,7 @@ export function SplitModal({
                 disabled={saving}
                 className="btn btn-danger-outline"
               >
-                Remove split
+                Remove Split
               </button>
             ) : (
               <div />
@@ -307,10 +322,10 @@ export function SplitModal({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !balanced}
+                disabled={saving}
                 className="btn btn-primary"
               >
-                {saving ? "Saving..." : "Save split"}
+                {saving ? "Saving…" : "Save Split"}
               </button>
             </div>
           </div>
