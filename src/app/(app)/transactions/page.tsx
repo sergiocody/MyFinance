@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { ActionMenu, type ActionMenuItem } from "@/components/ActionMenu";
 import { Card } from "@/components/Card";
 import { LabelMultiSelect } from "@/components/LabelMultiSelect";
 import Modal from "@/components/Modal";
@@ -11,6 +12,7 @@ import { SplitModal } from "@/components/SplitModal";
 import { createTransactionHash, formatCurrency, formatDate } from "@/lib/utils";
 import {
   ArrowDownLeft,
+  ArrowRight,
   ArrowRightLeft,
   ArrowUpRight,
   CalendarDays,
@@ -611,6 +613,28 @@ export default function TransactionsPage() {
     setSplitTarget(tx);
   }
 
+  function rowActions(tx: TransactionWithRelations): ActionMenuItem[] {
+    const isSynced = tx.source === "sync";
+    const actions: ActionMenuItem[] = [
+      { label: isSynced ? "Categorize" : "Edit", icon: Pencil, onSelect: () => openEdit(tx) },
+    ];
+    if (!isSynced) actions.push({ label: "Copy", icon: Copy, onSelect: () => openDuplicate(tx) });
+    if (tx.type !== "transfer") {
+      actions.push({ label: tx.is_split ? "Edit Split" : "Split", icon: Split, onSelect: () => openSplit(tx) });
+    }
+    if (!isSynced) {
+      actions.push({ label: "Delete", icon: Trash2, onSelect: () => void handleDelete(tx.id), danger: true });
+    }
+    return actions;
+  }
+
+  function handleRowClick(event: React.MouseEvent<HTMLTableRowElement>, tx: TransactionWithRelations) {
+    // Controls inside the row (and its popover menu) handle their own clicks; don't hijack text selection.
+    if ((event.target as HTMLElement).closest("button, a, input, select, textarea, label, [popover]")) return;
+    if (window.getSelection()?.isCollapsed === false) return;
+    openEdit(tx);
+  }
+
   const loadChildren = useCallback(async (parentId: string) => {
     const { data } = await supabase
       .from("transactions")
@@ -789,7 +813,7 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-none sm:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
           <button
             onClick={() => setShowFilters(!showFilters)}
             aria-expanded={showFilters}
@@ -1272,14 +1296,12 @@ export default function TransactionsPage() {
         <table className="hidden w-full text-sm md:table">
           <thead>
             <tr className="border-b border-[var(--color-border)] text-left">
-              <th className="label-caps px-4 py-3">Date</th>
+              <th className="label-caps hidden px-4 py-3 xl:table-cell">Date</th>
               <th className="label-caps px-4 py-3">Description</th>
               <th className="label-caps px-4 py-3">Account</th>
-              <th className="label-caps px-4 py-3">Destination</th>
               <th className="label-caps px-4 py-3">Category</th>
-              <th className="label-caps px-4 py-3">Labels</th>
               <th className="label-caps px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3">
+              <th className="w-px px-2 py-3">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -1287,13 +1309,13 @@ export default function TransactionsPage() {
           <tbody className="divide-y divide-[var(--color-border)]">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
                   <span role="status">Loading…</span>
                 </td>
               </tr>
             ) : transactions.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--color-secondary)]">
                   No transactions found
                 </td>
               </tr>
@@ -1303,11 +1325,15 @@ export default function TransactionsPage() {
                 const children = splitChildren[tx.id] ?? [];
                 const rows: React.ReactNode[] = [];
                 rows.push(
-                <tr key={tx.id} className="transition-colors duration-150 hover:bg-[rgba(26,28,30,0.03)]">
-                  <td className="whitespace-nowrap px-4 py-3 text-[var(--color-secondary)]">
+                <tr
+                  key={tx.id}
+                  onClick={(event) => handleRowClick(event, tx)}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-[rgba(26,28,30,0.03)]"
+                >
+                  <td className="hidden whitespace-nowrap px-4 py-3 text-[var(--color-secondary)] xl:table-cell">
                     {formatDate(tx.date)}
                   </td>
-                  <td className="max-w-80 px-4 py-3">
+                  <td className="w-full max-w-0 px-4 py-3">
                     <div className="flex items-start gap-2">
                       {tx.is_split && (
                         <button
@@ -1325,20 +1351,40 @@ export default function TransactionsPage() {
                         </button>
                       )}
                       <div className="min-w-0">
-                        <p
-                          className="truncate font-medium text-[var(--color-primary)]"
-                          title={tx.description || "—"}
+                        <button
+                          type="button"
+                          onClick={() => openEdit(tx)}
+                          aria-label={`${tx.source === "sync" ? "Categorize" : "Edit"} ${tx.description || "untitled transaction"}`}
+                          title={tx.description || undefined}
+                          className="pressable block max-w-full truncate rounded-sm text-left font-medium text-[var(--color-primary)]"
                         >
                           {tx.description || "—"}
-                        </p>
-                        {tx.is_split && (
-                          <span className="chip chip-info mt-1">
-                            <Split size={12} aria-hidden />
-                            Split
-                          </span>
+                        </button>
+                        <p className="text-xs text-[var(--color-secondary)] xl:hidden">{formatDate(tx.date)}</p>
+                        {(tx.is_split || (tx.transaction_labels?.length ?? 0) > 0) && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {tx.is_split && (
+                              <span className="chip chip-info">
+                                <Split size={12} aria-hidden />
+                                Split
+                              </span>
+                            )}
+                            {tx.transaction_labels?.map((tl) => (
+                              <span
+                                key={tl.labels.id}
+                                className="chip"
+                                style={{
+                                  backgroundColor: tl.labels.color + "20",
+                                  color: tl.labels.color,
+                                }}
+                              >
+                                {tl.labels.name}
+                              </span>
+                            ))}
+                          </div>
                         )}
                         {tx.notes && (
-                          <p className="truncate text-xs text-[var(--color-secondary)]" title={tx.notes}>
+                          <p className="mt-1 truncate text-xs text-[var(--color-secondary)]" title={tx.notes}>
                             {tx.notes}
                           </p>
                         )}
@@ -1346,30 +1392,32 @@ export default function TransactionsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-2 w-2 flex-none rounded-full"
-                        style={{ backgroundColor: tx.accounts?.color }}
-                      />
-                      <span className="block max-w-48 truncate text-[var(--color-secondary)]" title={tx.accounts?.name}>
-                        {tx.accounts?.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {tx.destination_account ? (
+                    <div className="space-y-1 text-[var(--color-secondary)]">
                       <div className="flex items-center gap-2">
-                        <div
+                        <span
+                          aria-hidden
                           className="h-2 w-2 flex-none rounded-full"
-                          style={{ backgroundColor: tx.destination_account.color }}
+                          style={{ backgroundColor: tx.accounts?.color }}
                         />
-                        <span className="text-[var(--color-secondary)]">
-                          {tx.destination_account.name}
+                        <span className="block max-w-40 truncate" title={tx.accounts?.name}>
+                          {tx.accounts?.name}
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-[var(--color-secondary)]">—</span>
-                    )}
+                      {tx.destination_account && (
+                        <div className="flex items-center gap-2">
+                          <ArrowRight size={12} aria-hidden className="flex-none" />
+                          <span className="sr-only">to</span>
+                          <span
+                            aria-hidden
+                            className="h-2 w-2 flex-none rounded-full"
+                            style={{ backgroundColor: tx.destination_account.color }}
+                          />
+                          <span className="block max-w-40 truncate" title={tx.destination_account.name}>
+                            {tx.destination_account.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <select
@@ -1396,22 +1444,6 @@ export default function TransactionsPage() {
                         ))}
                     </select>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {tx.transaction_labels?.map((tl) => (
-                        <span
-                          key={tl.labels.id}
-                          className="chip"
-                          style={{
-                            backgroundColor: tl.labels.color + "20",
-                            color: tl.labels.color,
-                          }}
-                        >
-                          {tl.labels.name}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">
                     <span
                       className={amountClass(tx.type, filterAccount, tx.transfer_to_account_id)}
@@ -1420,47 +1452,11 @@ export default function TransactionsPage() {
                       {formatCurrency(Number(tx.amount))}
                     </span>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex justify-end gap-1">
-                      {tx.source !== "sync" && (
-                        <button
-                          onClick={() => openDuplicate(tx)}
-                          aria-label="Copy transaction"
-                          title="Copy transaction"
-                          className="btn btn-ghost btn-icon"
-                        >
-                          <Copy size={16} aria-hidden />
-                        </button>
-                      )}
-                      {tx.type !== "transfer" && (
-                        <button
-                          onClick={() => openSplit(tx)}
-                          aria-label={tx.is_split ? "Edit split" : "Split transaction"}
-                          title={tx.is_split ? "Edit split" : "Split transaction"}
-                          className="btn btn-ghost btn-icon"
-                        >
-                          <Split size={16} aria-hidden />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openEdit(tx)}
-                        aria-label={tx.source === "sync" ? "Categorize transaction" : "Edit transaction"}
-                        title={tx.source === "sync" ? "Categorize" : "Edit"}
-                        className="btn btn-ghost btn-icon"
-                      >
-                        <Pencil size={16} aria-hidden />
-                      </button>
-                      {tx.source !== "sync" && (
-                        <button
-                          onClick={() => handleDelete(tx.id)}
-                          aria-label="Delete transaction"
-                          title="Delete transaction"
-                          className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
-                        >
-                          <Trash2 size={16} aria-hidden />
-                        </button>
-                      )}
-                    </div>
+                  <td className="px-2 py-2 text-right">
+                    <ActionMenu
+                      label={`Actions for ${tx.description || "untitled transaction"}`}
+                      items={rowActions(tx)}
+                    />
                   </td>
                 </tr>
                 );
@@ -1468,9 +1464,9 @@ export default function TransactionsPage() {
                   children.forEach((child) => {
                     rows.push(
                       <tr key={child.id} className="bg-[rgba(26,28,30,0.02)]">
-                        <td className="px-4 py-2 text-xs text-[var(--color-secondary)]" />
-                        <td className="px-4 py-2 pl-12 text-sm text-[var(--color-primary)]" colSpan={4}>
-                          <div className="flex items-center gap-2">
+                        <td className="hidden px-4 py-2 xl:table-cell" />
+                        <td className="px-4 py-2 pl-12 text-sm text-[var(--color-primary)]" colSpan={3}>
+                          <div className="flex flex-wrap items-center gap-2">
                             <span
                               className="chip"
                               style={
@@ -1489,10 +1485,6 @@ export default function TransactionsPage() {
                                 {child.description}
                               </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex flex-wrap gap-1">
                             {child.transaction_labels?.map((tl) => (
                               <span
                                 key={tl.labels.id}
@@ -1510,7 +1502,7 @@ export default function TransactionsPage() {
                         <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-medium tabular-nums text-[var(--color-secondary)]">
                           {formatCurrency(Number(child.amount))}
                         </td>
-                        <td className="px-4 py-2" />
+                        <td className="px-2 py-2" />
                       </tr>
                     );
                   });

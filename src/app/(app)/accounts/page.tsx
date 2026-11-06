@@ -18,17 +18,42 @@ import {
   CheckCircle2,
   XCircle,
   X,
+  Landmark,
+  PiggyBank,
+  TrendingUp,
+  Banknote,
+  CreditCard,
+  Wallet,
 } from "lucide-react";
 import type { Account, BankConnection } from "@/lib/database.types";
 
+// Order here drives both the form select and the section order on the page.
 const ACCOUNT_TYPES = [
-  { value: "checking", label: "Checking" },
-  { value: "savings", label: "Savings" },
-  { value: "credit_card", label: "Credit Card" },
-  { value: "cash", label: "Cash" },
-  { value: "investment", label: "Investment" },
-  { value: "other", label: "Other" },
+  { value: "checking", label: "Checking", groupLabel: "Checking", icon: Landmark, tone: "var(--color-primary)" },
+  { value: "savings", label: "Savings", groupLabel: "Savings", icon: PiggyBank, tone: "var(--color-success)" },
+  { value: "investment", label: "Investment", groupLabel: "Investments", icon: TrendingUp, tone: "var(--color-info)" },
+  { value: "cash", label: "Cash", groupLabel: "Cash", icon: Banknote, tone: "var(--color-warning)" },
+  { value: "credit_card", label: "Credit Card", groupLabel: "Credit Cards", icon: CreditCard, tone: "var(--color-tertiary)" },
+  { value: "other", label: "Other", groupLabel: "Other", icon: Wallet, tone: "var(--color-secondary)" },
 ] as const;
+
+function sumByCurrency(items: Account[], balanceOf: (account: Account) => number) {
+  const totals = new Map<string, number>();
+  for (const account of items) {
+    totals.set(account.currency, (totals.get(account.currency) ?? 0) + balanceOf(account));
+  }
+  return totals;
+}
+
+// Balances in different currencies are never added together.
+function formatTotals(totals: Map<string, number>) {
+  if (totals.size === 0) return "—";
+  return [...totals].map(([currency, value]) => formatCurrency(value, currency)).join(" · ");
+}
+
+function tint(color: string, percent: number) {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}
 
 const COLORS = [
   "#1A1C1E", "#6C7278", "#B8422E", "#3F6B4E", "#A86E2A",
@@ -128,7 +153,7 @@ function AccountTrendSparkline({
     return <div className="h-14 rounded-sm bg-[rgba(26,28,30,0.04)]" />;
   }
 
-  const width = 180;
+  const width = 300;
   const height = 56;
   const padding = 5;
   const values = points.map((point) => point.balance);
@@ -741,6 +766,208 @@ export default function AccountsPage() {
     setConnectModalOpen(true);
   }
 
+  const childTotals = new Map<string, number>();
+  for (const account of accounts) {
+    if (account.parent_account_id) {
+      childTotals.set(
+        account.parent_account_id,
+        (childTotals.get(account.parent_account_id) ?? 0) + Number(account.current_balance)
+      );
+    }
+  }
+
+  // Parents exclude sub-account money so totals never double count.
+  const effectiveBalance = (account: Account) =>
+    Number(account.current_balance) - (childTotals.get(account.id) ?? 0);
+
+  const activeAccounts = accounts.filter((account) => account.is_active);
+  const overallTotals = sumByCurrency(activeAccounts, effectiveBalance);
+  const primaryCurrency =
+    [...overallTotals].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0]?.[0] ?? "EUR";
+  const connectedCount = accounts.filter(
+    (account) => bankConnections[account.id]?.status === "linked"
+  ).length;
+
+  const accountGroups = ACCOUNT_TYPES.map((type) => {
+    const items = accounts
+      .filter((account) => account.type === type.value)
+      .sort(
+        (a, b) =>
+          Number(b.is_active) - Number(a.is_active) || effectiveBalance(b) - effectiveBalance(a)
+      );
+    const active = items.filter((account) => account.is_active);
+
+    return {
+      ...type,
+      items,
+      totals: sumByCurrency(active, effectiveBalance),
+      share: active
+        .filter((account) => account.currency === primaryCurrency)
+        .reduce((sum, account) => sum + Math.max(effectiveBalance(account), 0), 0),
+    };
+  }).filter((group) => group.items.length > 0);
+
+  const shareTotal = accountGroups.reduce((sum, group) => sum + group.share, 0);
+
+  function renderAccountCard(account: Account) {
+    const typeMeta = ACCOUNT_TYPES.find((type) => type.value === account.type);
+    const TypeIcon = typeMeta?.icon ?? Wallet;
+    const subAccountCount = accounts.filter((a) => a.parent_account_id === account.id).length;
+    const parentAccount = account.parent_account_id
+      ? accounts.find((a) => a.id === account.parent_account_id)
+      : undefined;
+    const balance = effectiveBalance(account);
+    const connection = bankConnections[account.id];
+
+    return (
+      <Card
+        key={account.id}
+        className={`relative flex flex-col transition duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--color-tertiary)] ${
+          !account.is_active ? "opacity-60" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <span
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-md"
+            style={{ backgroundColor: tint(account.color, 14), color: account.color }}
+          >
+            <TypeIcon size={18} aria-hidden />
+          </span>
+          <div className="relative z-10 -mr-2 -mt-2 flex flex-none gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(account)}
+              aria-label={`Edit account ${account.name}`}
+              className="btn btn-ghost btn-icon"
+            >
+              <Pencil size={16} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(account.id)}
+              aria-label={`Delete account ${account.name}`}
+              className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
+            >
+              <Trash2 size={16} aria-hidden />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 min-w-0">
+          <h3 className="truncate font-semibold text-[var(--color-primary)]">
+            {/* The ::after overlay makes the whole card clickable while keeping real link semantics. */}
+            <Link
+              href={`/transactions?account=${account.id}`}
+              className="after:absolute after:inset-0 after:rounded-md focus-visible:outline-none"
+            >
+              {account.name}
+            </Link>
+          </h3>
+          <p className="truncate text-xs text-[var(--color-secondary)]">
+            {account.bank_name || typeMeta?.label}
+            {account.iban && (
+              <span translate="no" className="tabular-nums">
+                {" "}· •••• {account.iban.slice(-4)}
+              </span>
+            )}
+          </p>
+        </div>
+
+        <div className="mt-4">
+          <p className="label-caps">{subAccountCount > 0 ? "Effective Balance" : "Balance"}</p>
+          <p
+            className={`stat-value mt-1 ${
+              balance >= 0 ? "text-[var(--color-primary)]" : "amount-neg"
+            }`}
+          >
+            {formatCurrency(balance, account.currency)}
+          </p>
+          {subAccountCount > 0 && (
+            <p className="mt-1 text-xs text-[var(--color-secondary)]">
+              Bank total {formatCurrency(Number(account.current_balance), account.currency)} · {subAccountCount}{" "}
+              sub-account{subAccountCount === 1 ? "" : "s"}
+            </p>
+          )}
+          {parentAccount && (
+            <p className="mt-1 truncate text-xs text-[var(--color-secondary)]">
+              Sub-account of {parentAccount.name}
+            </p>
+          )}
+        </div>
+
+        <div className="mb-4 mt-4">
+          <AccountTrendSparkline points={accountTrends[account.id] ?? []} color={account.color} />
+        </div>
+
+        <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-[var(--color-border)] pt-3">
+          {account.account_mode !== "automated" ? (
+            <span className="chip">Manual</span>
+          ) : connection?.status === "linked" ? (
+            <>
+              <span className="chip chip-success">
+                <Wifi size={12} aria-hidden />
+                Connected
+              </span>
+              {connection.last_synced_at && (
+                <span className="text-xs text-[var(--color-secondary)]">
+                  Synced {format(new Date(connection.last_synced_at), "dd MMM HH:mm")}
+                </span>
+              )}
+            </>
+          ) : connection?.status === "expired" || connection?.status === "error" ? (
+            <span className="chip chip-warning">
+              <WifiOff size={12} aria-hidden />
+              {connection.status === "expired" ? "Expired" : "Error"}
+            </span>
+          ) : (
+            <span className="chip">
+              <WifiOff size={12} aria-hidden />
+              Not connected
+            </span>
+          )}
+
+          <div className="relative z-10 -mr-2 ml-auto flex items-center gap-1">
+            {account.account_mode === "automated" &&
+              (connection?.status === "linked" ? (
+                <button
+                  type="button"
+                  onClick={() => handleSync(account.id)}
+                  disabled={syncing === account.id}
+                  className="btn btn-ghost btn-sm hover:text-[var(--color-tertiary)]"
+                >
+                  <RefreshCw
+                    size={14}
+                    aria-hidden
+                    className={syncing === account.id ? "animate-spin" : ""}
+                  />
+                  {syncing === account.id ? "Syncing…" : "Sync"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleConnectBank(account.id)}
+                  className="btn btn-ghost btn-sm hover:text-[var(--color-tertiary)]"
+                >
+                  <Link2 size={14} aria-hidden />
+                  {connection?.status === "expired" || connection?.status === "error"
+                    ? "Reconnect"
+                    : "Connect Bank"}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => toggleActive(account)}
+              aria-label={`${account.is_active ? "Active" : "Inactive"} — mark ${account.name} as ${account.is_active ? "inactive" : "active"}`}
+              className={`chip pressable hit-area ${account.is_active ? "chip-success" : ""}`}
+            >
+              {account.is_active ? "Active" : "Inactive"}
+            </button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -809,192 +1036,116 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-        {accounts.map((account) => (
-          <Card
-            key={account.id}
-            className={`relative transition duration-150 ease-in-out hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-[var(--color-tertiary)] ${
-              !account.is_active ? "opacity-50" : ""
-            } ${
-              account.account_mode === "automated"
-                ? "border-l-4 border-l-[var(--color-tertiary)]"
-                : ""
-            }`}
-          >
-            <div className="-mr-2 -mt-2 flex items-start justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-3 pt-2">
-                <div
-                  className="h-4 w-4 flex-none rounded-full"
-                  style={{ backgroundColor: account.color }}
-                />
-                <div className="min-w-0">
-                  <h2 className="truncate font-semibold text-[var(--color-primary)]">
-                    {/* The ::after overlay makes the whole card clickable while keeping real link semantics. */}
-                    <Link
-                      href={`/transactions?account=${account.id}`}
-                      className="after:absolute after:inset-0 after:rounded-md focus-visible:outline-none"
-                    >
-                      {account.name}
-                    </Link>
-                  </h2>
-                  <p className="truncate text-xs text-[var(--color-secondary)]">
-                    {account.bank_name && `${account.bank_name} · `}
-                    {ACCOUNT_TYPES.find((t) => t.value === account.type)?.label}
-                  </p>
-                  {account.iban && (
-                    <p
-                      className="mt-1 truncate text-xs tabular-nums text-[var(--color-secondary)]"
-                      title={account.iban}
-                    >
-                      IBAN {account.iban}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="relative z-10 flex flex-none gap-1">
-                <button
-                  type="button"
-                  onClick={() => openEdit(account)}
-                  aria-label={`Edit account ${account.name}`}
-                  className="btn btn-ghost btn-icon"
-                >
-                  <Pencil size={16} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(account.id)}
-                  aria-label={`Delete account ${account.name}`}
-                  className="btn btn-ghost btn-icon hover:text-[var(--color-danger)]"
-                >
-                  <Trash2 size={16} aria-hidden />
-                </button>
-              </div>
-            </div>
+      {accounts.length > 0 && (
+        <section
+          aria-labelledby="accounts-overview-title"
+          className="surface-card-strong rounded-md p-4 sm:p-6"
+        >
+          <h2 id="accounts-overview-title" className="label-caps">
+            Net Balance
+          </h2>
+          <p className="stat-value mt-1 text-[var(--color-primary)]">{formatTotals(overallTotals)}</p>
+          <p className="mt-1 text-xs text-[var(--color-secondary)]">
+            {activeAccounts.length} active account{activeAccounts.length === 1 ? "" : "s"} ·{" "}
+            {connectedCount} bank-connected
+          </p>
 
-            <div className="mt-4">
-              {accounts.some(a => a.parent_account_id === account.id) ? (
-                <>
-                  <p className="text-xs text-[var(--color-secondary)]">Effective Balance</p>
-                  <p
-                    className={`stat-value ${
-                      Number(account.current_balance) -
-                        accounts
-                          .filter(a => a.parent_account_id === account.id)
-                          .reduce((sum, a) => sum + Number(a.current_balance), 0) >=
-                      0
-                        ? "text-[var(--color-primary)]"
-                        : "amount-neg"
-                    }`}
-                  >
-                    {formatCurrency(
-                      Number(account.current_balance) -
-                        accounts
-                          .filter(a => a.parent_account_id === account.id)
-                          .reduce((sum, a) => sum + Number(a.current_balance), 0),
-                      account.currency
-                    )}
-                  </p>
-                  <p className="text-xs text-[var(--color-secondary)]">
-                    Bank total: {formatCurrency(Number(account.current_balance), account.currency)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-[var(--color-secondary)]">Current Balance</p>
-                  <p
-                    className={`stat-value ${
-                      Number(account.current_balance) >= 0
-                        ? "text-[var(--color-primary)]"
-                        : "amount-neg"
-                    }`}
-                  >
-                    {formatCurrency(Number(account.current_balance), account.currency)}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {account.account_mode === "automated" && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {bankConnections[account.id]?.status === "linked" ? (
-                  <>
-                    <Wifi size={12} className="text-[var(--color-success)]" aria-hidden />
-                    <span className="text-xs text-[var(--color-success)]">Connected</span>
-                    {bankConnections[account.id]?.last_synced_at && (
-                      <span className="text-xs text-[var(--color-secondary)]">
-                        · Synced{" "}
-                        {format(
-                          new Date(bankConnections[account.id].last_synced_at!),
-                          "dd MMM HH:mm"
-                        )}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleSync(account.id)}
-                      disabled={syncing === account.id}
-                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
-                    >
-                      <RefreshCw
-                        size={14}
-                        aria-hidden
-                        className={syncing === account.id ? "animate-spin" : ""}
-                      />
-                      {syncing === account.id ? "Syncing…" : "Sync"}
-                    </button>
-                  </>
-                ) : bankConnections[account.id]?.status === "expired" ||
-                  bankConnections[account.id]?.status === "error" ? (
-                  <>
-                    <WifiOff size={12} className="text-[var(--color-warning)]" aria-hidden />
-                    <span className="text-xs text-[var(--color-warning)]">
-                      {bankConnections[account.id]?.status === "expired" ? "Expired" : "Error"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleConnectBank(account.id)}
-                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-warning)]"
-                    >
-                      <Link2 size={14} aria-hidden />
-                      Reconnect
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff size={12} className="text-[var(--color-secondary)]" aria-hidden />
-                    <span className="text-xs text-[var(--color-secondary)]">Not connected</span>
-                    <button
-                      type="button"
-                      onClick={() => handleConnectBank(account.id)}
-                      className="btn btn-ghost btn-sm relative z-10 -mr-2 ml-auto hover:text-[var(--color-tertiary)]"
-                    >
-                      <Link2 size={14} aria-hidden />
-                      Connect Bank
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="mt-4">
-              <AccountTrendSparkline
-                points={accountTrends[account.id] ?? []}
-                color={account.color}
-              />
-            </div>
-
-            <div className="mt-3 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => toggleActive(account)}
-                aria-label={`${account.is_active ? "Active" : "Inactive"} — mark ${account.name} as ${account.is_active ? "inactive" : "active"}`}
-                className={`chip pressable hit-area z-10 ${account.is_active ? "chip-success" : ""}`}
+          {shareTotal > 0 && (
+            <>
+              <div
+                className="mt-5 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-[rgba(26,28,30,0.06)]"
+                aria-hidden
               >
-                {account.is_active ? "Active" : "Inactive"}
-              </button>
-            </div>
-          </Card>
-        ))}
+                {accountGroups
+                  .filter((group) => group.share > 0)
+                  .map((group) => (
+                    <div
+                      key={group.value}
+                      className="h-full transition-[width] duration-300 motion-reduce:transition-none"
+                      style={{
+                        width: `${(group.share / shareTotal) * 100}%`,
+                        backgroundColor: group.tone,
+                      }}
+                    />
+                  ))}
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-x-5">
+                {accountGroups.map((group) => {
+                  const percent = (group.share / shareTotal) * 100;
+
+                  return (
+                    <li key={group.value}>
+                      <a
+                        href={`#accounts-${group.value}`}
+                        className="tap-target group flex items-center gap-2 rounded-sm text-xs"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 flex-none rounded-full"
+                          style={{ backgroundColor: group.tone }}
+                          aria-hidden
+                        />
+                        <span className="text-[var(--color-secondary)] group-hover:text-[var(--color-primary)]">
+                          {group.groupLabel}
+                        </span>
+                        {group.share > 0 && (
+                          <span className="font-medium tabular-nums text-[var(--color-primary)]">
+                            {percent < 1 ? "<1%" : `${Math.round(percent)}%`}
+                          </span>
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              {overallTotals.size > 1 && (
+                <p className="mt-2 text-xs text-[var(--color-secondary)]">
+                  Distribution shows {primaryCurrency} balances only.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      <div className="space-y-8">
+        {accountGroups.map((group) => {
+          const GroupIcon = group.icon;
+
+          return (
+            <section
+              key={group.value}
+              id={`accounts-${group.value}`}
+              aria-labelledby={`accounts-${group.value}-title`}
+              className="space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--color-border)] pb-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="flex h-9 w-9 flex-none items-center justify-center rounded-md"
+                    style={{ backgroundColor: tint(group.tone, 12), color: group.tone }}
+                  >
+                    <GroupIcon size={18} aria-hidden />
+                  </span>
+                  <h2 id={`accounts-${group.value}-title`} className="section-title">
+                    {group.groupLabel}
+                  </h2>
+                  <span className="chip">
+                    {group.items.length}
+                    <span className="sr-only"> account{group.items.length === 1 ? "" : "s"}</span>
+                  </span>
+                </div>
+                <p className="text-base font-semibold tabular-nums text-[var(--color-primary)] sm:text-lg">
+                  <span className="sr-only">Subtotal: </span>
+                  {formatTotals(group.totals)}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                {group.items.map(renderAccountCard)}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {accounts.length === 0 && (
